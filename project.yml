@@ -1,0 +1,143 @@
+name: AltonApp
+options:
+  bundleIdPrefix: com.alton
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+  # XcodeGen drops `package =` for local SPM products (#1549) → Missing package product.
+  # Ensure CAS binary exists (local path; remote zip breaks SPM artifact mapping).
+  postGenCommand: bash Scripts/fetch-cas-binary.sh && bash Scripts/fix-local-spm-package-refs.sh
+configs:
+  Debug: debug
+  Staging: release
+  Release: release
+  AppStore: release
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    DEVELOPMENT_TEAM: X6GV877JLH
+    CODE_SIGN_STYLE: Automatic
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: 11.0.0
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: 8.0.0
+  MarkdownUI:
+    url: https://github.com/gonzalezreal/swift-markdown-ui
+    from: 2.4.0
+  Nuke:
+    url: https://github.com/kean/Nuke
+    from: 12.0.0
+  CleverAdsSolutions:
+    # Local base-only package — full CAS-iOS SPM pulls conflicting mediation adapters.
+    # Test ads work with CleverAdsSolutions binary alone (casID "demo" + withTestAdMode).
+    path: Vendor/CASBase
+targets:
+  AltonApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: AltonApp
+        excludes:
+          - Resources/GoogleService-Info.example.plist
+    dependencies:
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseMessaging
+      - package: Firebase
+        product: FirebaseAnalytics
+      - package: Firebase
+        product: FirebaseCrashlytics
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - package: MarkdownUI
+        product: MarkdownUI
+      - package: Nuke
+        product: Nuke
+      - package: Nuke
+        product: NukeUI
+      # Base CAS framework only — enough for Test Ads during development.
+      # Add CASMediation* products when wiring production ad networks.
+      - package: CleverAdsSolutions
+        product: CleverAdsSolutionsSPM
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alton.altonApp
+        INFOPLIST_FILE: AltonApp/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: AltonApp/Resources/AltonApp.debug.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+        CURRENT_PROJECT_VERSION: 3
+        MARKETING_VERSION: 1.0
+        OTHER_LDFLAGS: "$(inherited) -ObjC"
+        OTHER_SWIFT_FLAGS: "$(inherited) -Xcc -DCI_SILENCE_GL_DEPRECATION"
+      configs:
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: AltonApp/Resources/AltonApp.debug.entitlements
+          INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG ALTON_DEV"
+        Staging:
+          # TestFlight → dev backends (dev-*.altons.trade). APS production for ASC/TF.
+          CODE_SIGN_ENTITLEMENTS: AltonApp/Resources/AltonApp.staging.entitlements
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: ALTON_DEV
+        Release:
+          CODE_SIGN_ENTITLEMENTS: AltonApp/Resources/AltonApp.release.entitlements
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: ENABLE_CERT_PINNING
+        # App Store distribution: archive + upload via Scripts/distribute-appstore.sh
+        # (ExportOptions/AppStore.plist sets uploadSymbols=false — Google binary
+        # SPM frameworks ship without dSYMs; Crashlytics handles crash reports).
+        AppStore:
+          CODE_SIGN_ENTITLEMENTS: AltonApp/Resources/AltonApp.release.entitlements
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: ENABLE_CERT_PINNING
+  AltonAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AltonAppTests
+    dependencies:
+      - target: AltonApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alton.altonApp.tests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  AltonApp:
+    build:
+      targets:
+        AltonApp: all
+    run:
+      config: Debug
+    test:
+      targets:
+        - AltonAppTests
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+  AltonApp Dev:
+    build:
+      targets:
+        AltonApp: all
+    run:
+      config: Staging
+    profile:
+      config: Staging
+    analyze:
+      config: Staging
+    archive:
+      config: Staging
+  AltonApp AppStore:
+    build:
+      targets:
+        AltonApp: all
+    archive:
+      config: AppStore

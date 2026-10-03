@@ -1,0 +1,13 @@
+.DS_Store
+DerivedData/
+.derivedData/
+.compile
+buildServer.json
+build/
+*.xcuserstate
+xcuserdata/
+AltonApp/Config/CameraKitSecrets.local.xcconfig
+AltonApp/Resources/GoogleService-Info.plist
+# Large CAS binary — restore with: Scripts/fetch-cas-binary.sh
+Vendor/CASBase/CleverAdsSolutions.xcframework/
+Vendor/CASBase/CASBaseResources.bundle/

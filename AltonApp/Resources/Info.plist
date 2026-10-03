@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Take</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.alton.altonApp</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>alton</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.alton.altonApp.google</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.1059021628778-17lvpgohenifhlai79bfjrsgadqrfnee</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>KlipyAPIKey</key>
+	<string>aQCjdqTea0Jwf5iE4aU8tdMMpg27tqlO5GHq12KJtp40ZYTFjb5u0EsDBI1UubOH</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Inter.ttc</string>
+	</array>
+
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Take needs access to your music library to add background music to shots.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Take uses Bluetooth for compatible audio accessories during shot recording.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Take uses Bluetooth for compatible audio accessories during shot recording.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Take needs camera access to record vertical shots.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Take uses contacts to help you find and connect with people you know.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Take connects to local development services on your network during testing.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Take needs microphone access to record audio with your shots.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Take needs permission to save recorded shots and photos to your library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Take needs photo library access to attach images to your takes.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Take uses speech recognition to generate automatic subtitles for your shots.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Take uses your device advertising identifier to measure ad performance and support creator monetization.</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>INSendMessageIntent</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+</dict>
+</plist>
