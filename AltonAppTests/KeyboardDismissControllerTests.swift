@@ -16,11 +16,38 @@ final class KeyboardDismissControllerTests: XCTestCase {
         XCTAssertEqual(controller.keyboardHeight, 0)
     }
 
+    @MainActor func testVisibleWithNilUserInfoResetsKeyboardHeightToZero() {
+        let controller = KeyboardDismissController()
+        controller.keyboardHeight = 250 // Pre-existing height to verify reset
+        NotificationCenter.default.post(name: UIResponder.keyboardWillShowNotification, object: nil, userInfo: nil)
+        XCTAssertTrue(controller.isKeyboardVisible)
+        XCTAssertEqual(controller.keyboardHeight, 0)
+    }
+
     @MainActor func testDismissResignsFirstResponder() {
+        let window: UIWindow
+        if let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first {
+            window = UIWindow(windowScene: scene)
+        } else {
+            window = UIWindow(frame: CGRect(x: 0, y: 0, width: 300, height: 400))
+        }
+        let textField = UITextField(frame: CGRect(x: 0, y: 0, width: 200, height: 40))
+        window.addSubview(textField)
+        window.makeKeyAndVisible()
+        defer {
+            textField.removeFromSuperview()
+            window.resignKey()
+            window.isHidden = true
+        }
+
+        let becameFirstResponder = textField.becomeFirstResponder()
+        XCTAssertTrue(becameFirstResponder)
+        XCTAssertTrue(textField.isFirstResponder)
+
         let controller = KeyboardDismissController()
         controller.isKeyboardVisible = true
-        // UIApplication.shared.sendAction resigns first responder; assert no crash and visible stays mutable.
         controller.dismiss()
-        XCTAssertTrue(true) // smoke — resign has no return value
+
+        XCTAssertFalse(textField.isFirstResponder, "Dismiss should resign first responder")
     }
 }

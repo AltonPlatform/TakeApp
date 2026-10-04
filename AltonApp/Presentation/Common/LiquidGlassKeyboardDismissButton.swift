@@ -1,15 +1,23 @@
 import SwiftUI
 import UIKit
 
+/// Controller tracking keyboard visibility and height for floating dismiss controls.
+///
+/// When `keyboardWillShowNotification` is received without a valid frame in its `userInfo`,
+/// `isKeyboardVisible` is set to `true` while `keyboardHeight` resets to `0`.
 @MainActor @Observable final class KeyboardDismissController {
     var isKeyboardVisible = false
     var keyboardHeight: CGFloat = 0
-    nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
+    @ObservationIgnored nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
     init() {
         observers.append(NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { [weak self] note in
             guard let self else { return }
             self.isKeyboardVisible = true
-            if let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect { self.keyboardHeight = frame.height }
+            if let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                self.keyboardHeight = frame.height
+            } else {
+                self.keyboardHeight = 0
+            }
         })
         observers.append(NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
@@ -45,6 +53,10 @@ struct LiquidGlassKeyboardDismissButton: View {
 extension View {
     /// Overlays the glass Done button at bottom-trailing, lifted by `keyboardHeight`
     /// so it floats just above the keyboard's top edge. Hidden when keyboard is down.
+    ///
+    /// The overlay content ignores the keyboard safe area (`.ignoresSafeArea(.keyboard)`) so that
+    /// the explicit `-(controller.keyboardHeight) - 8` offset correctly positions the button just above
+    /// the keyboard top edge regardless of whether the host view handles or ignores keyboard safe area.
     func liquidGlassKeyboardDismiss(controller: KeyboardDismissController) -> some View {
         overlay(alignment: .bottomTrailing) {
             LiquidGlassKeyboardDismissButton(controller: controller)
@@ -52,6 +64,7 @@ extension View {
                 .offset(y: -(controller.keyboardHeight) - 8)
                 .allowsHitTesting(controller.isKeyboardVisible)
                 .animation(.easeInOut(duration: 0.25), value: controller.keyboardHeight)
+                .ignoresSafeArea(.keyboard)
         }
     }
 }
