@@ -528,7 +528,9 @@ struct RichTextEditorView: UIViewRepresentable {
             let location = min(max(replacement.location, 0), mutable.length)
             let length = min(max(replacement.length, 0), mutable.length - location)
             var attributes = RichTextStyle.baseAttributes()
-            attributes[.foregroundColor] = UIColor.link
+            // Monochrome ink (not `UIColor.link`). Deliberately NOT bold: a bold font
+            // would serialize the mention as `**@name**` in the markdown converter.
+            attributes[.foregroundColor] = ComposerMentionStyle.uiColor
             mutable.replaceCharacters(
                 in: NSRange(location: location, length: length),
                 with: NSAttributedString(string: replacement.text, attributes: attributes)

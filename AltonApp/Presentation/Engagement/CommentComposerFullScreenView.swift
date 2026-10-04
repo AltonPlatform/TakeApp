@@ -110,11 +110,13 @@ struct CommentComposerFullScreenView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
+                        .foregroundStyle(ComposerPalette.monochrome.primary)
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button(isPreviewMode ? "Edit" : "Preview") {
                         isPreviewMode.toggle()
                     }
+                    .foregroundStyle(ComposerPalette.monochrome.primary)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {

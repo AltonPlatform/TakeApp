@@ -281,17 +281,14 @@ private extension View {
 
 // MARK: - Style
 
-/// Fixed light tokens per the take-composer design; Task 8 folds these into `ComposerPalette`.
+/// `.takeComposer` strip tokens — colors come from `ComposerPalette.monochrome`; `.legacy` keeps its own system colors.
 private enum AttachmentStripTokens {
     static let cornerRadius: CGFloat = 8
-    /// `#eaecf0`
-    static let border = Color(red: 234 / 255, green: 236 / 255, blue: 240 / 255)
-    static let addBackground = Color(red: 234 / 255, green: 236 / 255, blue: 240 / 255)
-    /// `#8d939c`
-    static let addForeground = Color(red: 141 / 255, green: 147 / 255, blue: 156 / 255)
-    /// `#1c1c1e`
-    static let removeForeground = Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255)
-    static let removeBackground = Color.white
+    static let border = ComposerPalette.monochrome.divider
+    static let addBackground = ComposerPalette.monochrome.activeFill
+    static let addForeground = ComposerPalette.monochrome.muted
+    static let removeForeground = ComposerPalette.monochrome.primary
+    static let removeBackground = ComposerPalette.monochrome.onPrimary
     static let glyphStroke = StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
 }
 

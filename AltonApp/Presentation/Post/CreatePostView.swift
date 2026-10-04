@@ -189,6 +189,7 @@ struct CreatePostView: View {
                             viewModel.cancelComposer()
                             dismiss()
                         }
+                        .foregroundStyle(ComposerPalette.monochrome.primary)
                         .disabled(viewModel.isSubmitting)
                     }
                 }

@@ -157,8 +157,10 @@
 		918E2E1A0D9E3972DE59B1D1 /* AnalyticsDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83A036941875D6CE6775687B /* AnalyticsDashboardView.swift */; };
 		9193B6159110F85CB85941FC /* CreatePostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA68C64C7BBC00B9EDF0A32C /* CreatePostView.swift */; };
 		A1B2C3D4E5F6000400000002 /* ComposerBottomChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000400000001 /* ComposerBottomChrome.swift */; };
+		A1B2C3D4E5F6000B00000002 /* ComposerTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000B00000001 /* ComposerTheme.swift */; };
 		A1B2C3D4E5F6000500000002 /* MentionOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000500000001 /* MentionOverlayView.swift */; };
 		A1B2C3D4E5F6000300000002 /* ComposerBottomChromeStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000300000001 /* ComposerBottomChromeStateTests.swift */; };
+		A1B2C3D4E5F6000A00000002 /* MonochromeColorPassTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000A00000001 /* MonochromeColorPassTests.swift */; };
 		A1B2C3D4E5F6000600000002 /* MentionOverlayStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000600000001 /* MentionOverlayStateTests.swift */; };
 		A1B2C3D4E5F6000700000002 /* AttachmentReorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000700000001 /* AttachmentReorderTests.swift */; };
 		A1B2C3D4E5F6000800000002 /* LiquidGlassDismissAdoptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000800000001 /* LiquidGlassDismissAdoptionTests.swift */; };
@@ -520,8 +522,10 @@
 		B9E5102737BC7277DD3A499F /* PasskeyAuthProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasskeyAuthProvider.swift; sourceTree = "<group>"; };
 		BA68C64C7BBC00B9EDF0A32C /* CreatePostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreatePostView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000400000001 /* ComposerBottomChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerBottomChrome.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000B00000001 /* ComposerTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerTheme.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000500000001 /* MentionOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionOverlayView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000300000001 /* ComposerBottomChromeStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerBottomChromeStateTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000A00000001 /* MonochromeColorPassTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonochromeColorPassTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000600000001 /* MentionOverlayStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionOverlayStateTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000700000001 /* AttachmentReorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentReorderTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000800000001 /* LiquidGlassDismissAdoptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassDismissAdoptionTests.swift; sourceTree = "<group>"; };
@@ -690,6 +694,7 @@
 				6E9C8599DF1DEF9A72CCF469 /* DraftStoreTests.swift */,
 				A1B2C3D4E5F6000100000001 /* KeyboardDismissControllerTests.swift */,
 				A1B2C3D4E5F6000300000001 /* ComposerBottomChromeStateTests.swift */,
+				A1B2C3D4E5F6000A00000001 /* MonochromeColorPassTests.swift */,
 				A1B2C3D4E5F6000600000001 /* MentionOverlayStateTests.swift */,
 				A1B2C3D4E5F6000700000001 /* AttachmentReorderTests.swift */,
 				A1B2C3D4E5F6000800000001 /* LiquidGlassDismissAdoptionTests.swift */,
@@ -1186,6 +1191,7 @@
 			children = (
 				BA68C64C7BBC00B9EDF0A32C /* CreatePostView.swift */,
 				A1B2C3D4E5F6000400000001 /* ComposerBottomChrome.swift */,
+				A1B2C3D4E5F6000B00000001 /* ComposerTheme.swift */,
 				A1B2C3D4E5F6000500000001 /* MentionOverlayView.swift */,
 				0D5B007C37C5258CF56483AA /* CreatePostViewModel.swift */,
 				B64BC0B72726316481D709FB /* DraftsView.swift */,
@@ -1590,6 +1596,7 @@
 				6E10D02ECE36410A5A39C43A /* CrashReporting.swift in Sources */,
 				9193B6159110F85CB85941FC /* CreatePostView.swift in Sources */,
 				A1B2C3D4E5F6000400000002 /* ComposerBottomChrome.swift in Sources */,
+				A1B2C3D4E5F6000B00000002 /* ComposerTheme.swift in Sources */,
 				A1B2C3D4E5F6000500000002 /* MentionOverlayView.swift in Sources */,
 				0BA6261D5583B681BD308514 /* CreatePostViewModel.swift in Sources */,
 				53C9641C490BB5B194B08F34 /* CreatorWalletView.swift in Sources */,
@@ -1800,6 +1807,7 @@
 				03C15A9F1B248E3ECF404E5A /* DraftStoreTests.swift in Sources */,
 				A1B2C3D4E5F6000100000002 /* KeyboardDismissControllerTests.swift in Sources */,
 				A1B2C3D4E5F6000300000002 /* ComposerBottomChromeStateTests.swift in Sources */,
+				A1B2C3D4E5F6000A00000002 /* MonochromeColorPassTests.swift in Sources */,
 				A1B2C3D4E5F6000600000002 /* MentionOverlayStateTests.swift in Sources */,
 				A1B2C3D4E5F6000700000002 /* AttachmentReorderTests.swift in Sources */,
 				A1B2C3D4E5F6000800000002 /* LiquidGlassDismissAdoptionTests.swift in Sources */,

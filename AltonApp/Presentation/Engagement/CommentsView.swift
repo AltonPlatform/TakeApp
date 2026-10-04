@@ -185,7 +185,7 @@ struct CommentsView: View {
                 matching: .images
             ) {
                 Image(systemName: "photo")
-                    .foregroundStyle(remainingAttachmentSlots > 0 ? Color.accentColor : Color.secondary.opacity(0.45))
+                    .foregroundStyle(remainingAttachmentSlots > 0 ? ComposerPalette.monochrome.accent : Color.secondary.opacity(0.45))
             }
             .disabled(remainingAttachmentSlots == 0)
             .accessibilityLabel("Attach photos")
@@ -195,7 +195,7 @@ struct CommentsView: View {
             } label: {
                 Text("GIF")
                     .font(.caption2.weight(.heavy))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(ComposerPalette.monochrome.accent)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("GIF")
@@ -205,7 +205,7 @@ struct CommentsView: View {
                     showStickerPicker = true
                 } label: {
                     Image(systemName: "face.smiling")
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(ComposerPalette.monochrome.accent)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Stickers")
@@ -220,6 +220,7 @@ struct CommentsView: View {
                     Image(systemName: "paperplane.fill")
                 }
             }
+            .tint(ComposerPalette.monochrome.accent)
             .disabled(!canSend)
         }
         .padding()

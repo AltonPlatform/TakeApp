@@ -15,29 +15,6 @@ struct MentionOverlayState: Equatable {
     var isVisible: Bool { !candidates.isEmpty }
 }
 
-// MARK: - Color tokens (adaptive; matching ComposerBottomChrome)
-
-private extension Color {
-    /// Light `#1c1c1e` / dark `#f5f5f7`.
-    static let overlayInk = Color(uiColor: UIColor { tc in
-        tc.userInterfaceStyle == .dark
-            ? UIColor(red: 245 / 255, green: 245 / 255, blue: 247 / 255, alpha: 1)
-            : UIColor(red: 28 / 255, green: 28 / 255, blue: 30 / 255, alpha: 1)
-    })
-    /// Light `#eaecf0` / dark `#2c2c2e`.
-    static let overlayHairline = Color(uiColor: UIColor { tc in
-        tc.userInterfaceStyle == .dark
-            ? UIColor(red: 44 / 255, green: 44 / 255, blue: 46 / 255, alpha: 1)
-            : UIColor(red: 234 / 255, green: 236 / 255, blue: 240 / 255, alpha: 1)
-    })
-    /// Light `#a0a3ab` / dark `#8e8e93`.
-    static let overlaySecondary = Color(uiColor: UIColor { tc in
-        tc.userInterfaceStyle == .dark
-            ? UIColor(red: 142 / 255, green: 142 / 255, blue: 147 / 255, alpha: 1)
-            : UIColor(red: 160 / 255, green: 163 / 255, blue: 171 / 255, alpha: 1)
-    })
-}
-
 // MARK: - MentionOverlayView
 
 /// Floating glass overlay displaying mention suggestions above the bottom chrome.
@@ -76,7 +53,7 @@ struct MentionOverlayView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.overlayHairline, lineWidth: 1)
+                    .stroke(ComposerPalette.monochrome.divider, lineWidth: 1)
             )
             .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 4)
         }
@@ -92,12 +69,12 @@ struct MentionOverlayView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(candidate.displayName.isEmpty ? candidate.username : candidate.displayName)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.overlayInk)
+                        .foregroundStyle(ComposerPalette.monochrome.primary)
                         .lineLimit(1)
 
                     Text("@\(candidate.username)")
                         .font(.system(size: 13))
-                        .foregroundStyle(Color.overlaySecondary)
+                        .foregroundStyle(ComposerPalette.monochrome.secondary)
                         .lineLimit(1)
                 }
 
@@ -109,7 +86,7 @@ struct MentionOverlayView: View {
             .overlay(alignment: .bottom) {
                 if !isLast {
                     Rectangle()
-                        .fill(Color.overlayHairline)
+                        .fill(ComposerPalette.monochrome.divider)
                         .frame(height: 1)
                         .padding(.leading, 50)
                 }
@@ -140,13 +117,13 @@ struct MentionOverlayView: View {
 
     private func avatarPlaceholder(for candidate: MentionCandidate) -> some View {
         Circle()
-            .fill(Color.overlayHairline)
+            .fill(ComposerPalette.monochrome.divider)
             .frame(width: 28, height: 28)
             .overlay {
                 let initial = String((candidate.displayName.isEmpty ? candidate.username : candidate.displayName).prefix(1)).uppercased()
                 Text(initial)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.overlaySecondary)
+                    .foregroundStyle(ComposerPalette.monochrome.secondary)
             }
     }
 }

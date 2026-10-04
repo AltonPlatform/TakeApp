@@ -724,7 +724,7 @@ private struct ShotCommentsSheetContent: View {
                 } else {
                     Image(systemName: "paperplane.fill")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(canSend ? Color.accentColor : Color.secondary.opacity(0.45))
+                        .foregroundStyle(canSend ? ComposerPalette.monochrome.accent : Color.secondary.opacity(0.45))
                         .frame(width: 28, height: 28)
                 }
             }

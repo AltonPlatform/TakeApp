@@ -1,35 +1,5 @@
 import SwiftUI
 
-// MARK: - Color tokens (adaptive; formalized into ComposerPalette later)
-
-private extension Color {
-    /// Light `#1c1c1e` / dark `#f5f5f7`.
-    static let chromeInk = Color(uiColor: UIColor { tc in
-        tc.userInterfaceStyle == .dark
-            ? UIColor(red: 245 / 255, green: 245 / 255, blue: 247 / 255, alpha: 1)
-            : UIColor(red: 28 / 255, green: 28 / 255, blue: 30 / 255, alpha: 1)
-    })
-    /// Text/spinner drawn on top of `chromeInk` fills — the inverse of ink.
-    /// Light `#ffffff` / dark `#1c1c1e`.
-    static let chromeOnInk = Color(uiColor: UIColor { tc in
-        tc.userInterfaceStyle == .dark
-            ? UIColor(red: 28 / 255, green: 28 / 255, blue: 30 / 255, alpha: 1)
-            : UIColor.white
-    })
-    /// Light `#eaecf0` / dark `#2c2c2e`.
-    static let chromeHairline = Color(uiColor: UIColor { tc in
-        tc.userInterfaceStyle == .dark
-            ? UIColor(red: 44 / 255, green: 44 / 255, blue: 46 / 255, alpha: 1)
-            : UIColor(red: 234 / 255, green: 236 / 255, blue: 240 / 255, alpha: 1)
-    })
-    /// Light `#a0a3ab` / dark `#8e8e93`.
-    static let chromeSecondary = Color(uiColor: UIColor { tc in
-        tc.userInterfaceStyle == .dark
-            ? UIColor(red: 142 / 255, green: 142 / 255, blue: 147 / 255, alpha: 1)
-            : UIColor(red: 160 / 255, green: 163 / 255, blue: 171 / 255, alpha: 1)
-    })
-}
-
 // MARK: - State
 
 /// Rule deciding whether the composer's Post pill is tappable.
@@ -118,7 +88,7 @@ struct ComposerIconView: View {
 
     var body: some View {
         ComposerIconShape(icon: icon)
-            .stroke(Color.chromeInk, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+            .stroke(ComposerPalette.monochrome.primary, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
             .frame(width: size, height: size)
             .accessibilityHidden(true)
     }
@@ -406,7 +376,7 @@ struct ComposerBottomChrome: View {
                 formatCapsuleRow
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
                 Rectangle()
-                    .fill(Color.chromeHairline)
+                    .fill(ComposerPalette.monochrome.divider)
                     .frame(height: 1)
             }
             toolRow
@@ -414,7 +384,7 @@ struct ComposerBottomChrome: View {
         .background(.regularMaterial)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color.chromeHairline)
+                .fill(ComposerPalette.monochrome.divider)
                 .frame(height: 1)
         }
         // Inset top highlight: faint glass edge just below the hairline.
@@ -438,7 +408,7 @@ struct ComposerBottomChrome: View {
                 }
 
                 Rectangle()
-                    .fill(Color.chromeHairline)
+                    .fill(ComposerPalette.monochrome.divider)
                     .frame(width: 1, height: 18)
                     .padding(.horizontal, 6)
 
@@ -448,7 +418,7 @@ struct ComposerBottomChrome: View {
             }
             .padding(.horizontal, 6)
             .background(.thinMaterial, in: Capsule())
-            .overlay(Capsule().stroke(Color.chromeHairline, lineWidth: 1))
+            .overlay(Capsule().stroke(ComposerPalette.monochrome.divider, lineWidth: 1))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
         }
@@ -464,7 +434,7 @@ struct ComposerBottomChrome: View {
         } label: {
             ComposerIconView(icon: icon, size: 24)
                 .frame(width: 36, height: 36)
-                .background(isOn ? Color.chromeHairline : Color.clear, in: Capsule())
+                .background(isOn ? ComposerPalette.monochrome.activeFill : Color.clear, in: Capsule())
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -503,7 +473,7 @@ struct ComposerBottomChrome: View {
     private func toolLabel(_ icon: ComposerIcon, isActive: Bool, disabled: Bool = false) -> some View {
         ComposerIconView(icon: icon, size: 22)
             .frame(width: 40, height: 32)
-            .background(isActive ? Color.chromeHairline : Color.clear, in: Capsule())
+            .background(isActive ? ComposerPalette.monochrome.activeFill : Color.clear, in: Capsule())
             .frame(width: 40, height: 44)
             .contentShape(Rectangle())
             .opacity(disabled ? 0.35 : 1)
@@ -552,10 +522,10 @@ struct ComposerBottomChrome: View {
             HStack(spacing: 6) {
                 ZStack {
                     Circle()
-                        .stroke(Color.chromeHairline, lineWidth: 2)
+                        .stroke(ComposerPalette.monochrome.divider, lineWidth: 2)
                     Circle()
                         .trim(from: 0, to: progress)
-                        .stroke(Color.chromeInk, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .stroke(ComposerPalette.monochrome.primary, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
                 .frame(width: 18, height: 18)
@@ -564,7 +534,7 @@ struct ComposerBottomChrome: View {
                 if remainingCharacters < 200 {
                     Text("\(remainingCharacters)")
                         .font(.caption.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(remainingCharacters < 0 ? Color.chromeInk : Color.chromeSecondary)
+                        .foregroundStyle(remainingCharacters < 0 ? ComposerPalette.monochrome.primary : ComposerPalette.monochrome.secondary)
                 }
             }
             .padding(.trailing, 8)
@@ -580,7 +550,7 @@ struct ComposerBottomChrome: View {
         return Button(action: onPublish) {
             Group {
                 if publishState.isSubmitting {
-                    ProgressView().tint(Color.chromeOnInk)
+                    ProgressView().tint(ComposerPalette.monochrome.onPrimary)
                 } else {
                     Text(publishTitle)
                         .font(.system(size: 14, weight: .semibold))
@@ -588,10 +558,10 @@ struct ComposerBottomChrome: View {
             }
             // Same minimum width for spinner and title so the pill doesn't jump.
             .frame(minWidth: 44)
-            .foregroundStyle(isDimmed ? Color.chromeSecondary : Color.chromeOnInk)
+            .foregroundStyle(isDimmed ? ComposerPalette.monochrome.secondary : ComposerPalette.monochrome.onPrimary)
             .padding(.horizontal, 18)
             .padding(.vertical, 7)
-            .background(isDimmed ? Color.chromeHairline : Color.chromeInk, in: Capsule())
+            .background(isDimmed ? ComposerPalette.monochrome.divider : ComposerPalette.monochrome.primary, in: Capsule())
             .frame(minHeight: 44)
             .contentShape(Capsule())
         }
