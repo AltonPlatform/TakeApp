@@ -156,7 +156,9 @@
 		918E2E1A0D9E3972DE59B1D1 /* AnalyticsDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83A036941875D6CE6775687B /* AnalyticsDashboardView.swift */; };
 		9193B6159110F85CB85941FC /* CreatePostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA68C64C7BBC00B9EDF0A32C /* CreatePostView.swift */; };
 		A1B2C3D4E5F6000400000002 /* ComposerBottomChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000400000001 /* ComposerBottomChrome.swift */; };
+		A1B2C3D4E5F6000500000002 /* MentionOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000500000001 /* MentionOverlayView.swift */; };
 		A1B2C3D4E5F6000300000002 /* ComposerBottomChromeStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000300000001 /* ComposerBottomChromeStateTests.swift */; };
+		A1B2C3D4E5F6000600000002 /* MentionOverlayStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000600000001 /* MentionOverlayStateTests.swift */; };
 		91A49CDC3C4E403A06BD9882 /* NativeAdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 962AF83F0D9D05ECCEDFD540 /* NativeAdView.swift */; };
 		91E7DD66937819B904051706 /* TextComposerCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39701641210DBB49EEE05B0B /* TextComposerCanvasView.swift */; };
 		9271934BC19FC9C93A52342C /* EditorCompositionInstruction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D07823A0E2DD5D8E5DDC93D /* EditorCompositionInstruction.swift */; };
@@ -514,7 +516,9 @@
 		B9E5102737BC7277DD3A499F /* PasskeyAuthProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasskeyAuthProvider.swift; sourceTree = "<group>"; };
 		BA68C64C7BBC00B9EDF0A32C /* CreatePostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreatePostView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000400000001 /* ComposerBottomChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerBottomChrome.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000500000001 /* MentionOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionOverlayView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000300000001 /* ComposerBottomChromeStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerBottomChromeStateTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000600000001 /* MentionOverlayStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionOverlayStateTests.swift; sourceTree = "<group>"; };
 		BD2AEEC942908EB79CC428E1 /* PhotoCaptureProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCaptureProcessor.swift; sourceTree = "<group>"; };
 		BDB1562F7DB687E8904197D1 /* PushRegistrationCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushRegistrationCenter.swift; sourceTree = "<group>"; };
 		C095CA0BC511D0B8CFA327BC /* AltonApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AltonApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -680,6 +684,7 @@
 				6E9C8599DF1DEF9A72CCF469 /* DraftStoreTests.swift */,
 				A1B2C3D4E5F6000100000001 /* KeyboardDismissControllerTests.swift */,
 				A1B2C3D4E5F6000300000001 /* ComposerBottomChromeStateTests.swift */,
+				A1B2C3D4E5F6000600000001 /* MentionOverlayStateTests.swift */,
 				C83AF7352891D4EFF19411DB /* NetworkSessionFactoryTests.swift */,
 				416E84B48554CDB2E8D90585 /* PostUseCaseShotPublishTests.swift */,
 				6116E5F7A297D9BB7247DC45 /* RichTextMarkdownConverterTests.swift */,
@@ -1172,6 +1177,7 @@
 			children = (
 				BA68C64C7BBC00B9EDF0A32C /* CreatePostView.swift */,
 				A1B2C3D4E5F6000400000001 /* ComposerBottomChrome.swift */,
+				A1B2C3D4E5F6000500000001 /* MentionOverlayView.swift */,
 				0D5B007C37C5258CF56483AA /* CreatePostViewModel.swift */,
 				B64BC0B72726316481D709FB /* DraftsView.swift */,
 				B8FEFEED01A2B3C4D5E6F701 /* FeedImagePrefetcher.swift */,
@@ -1575,6 +1581,7 @@
 				6E10D02ECE36410A5A39C43A /* CrashReporting.swift in Sources */,
 				9193B6159110F85CB85941FC /* CreatePostView.swift in Sources */,
 				A1B2C3D4E5F6000400000002 /* ComposerBottomChrome.swift in Sources */,
+				A1B2C3D4E5F6000500000002 /* MentionOverlayView.swift in Sources */,
 				0BA6261D5583B681BD308514 /* CreatePostViewModel.swift in Sources */,
 				53C9641C490BB5B194B08F34 /* CreatorWalletView.swift in Sources */,
 				F7A91C2E4B8D03F15A6E9D21 /* ProfilePeekPreview.swift in Sources */,
@@ -1784,6 +1791,7 @@
 				03C15A9F1B248E3ECF404E5A /* DraftStoreTests.swift in Sources */,
 				A1B2C3D4E5F6000100000002 /* KeyboardDismissControllerTests.swift in Sources */,
 				A1B2C3D4E5F6000300000002 /* ComposerBottomChromeStateTests.swift in Sources */,
+				A1B2C3D4E5F6000600000002 /* MentionOverlayStateTests.swift in Sources */,
 				F336066A91711BFDC4299AAF /* NetworkSessionFactoryTests.swift in Sources */,
 				C6CF1C86E64E8ECF2F23CB22 /* PostUseCaseShotPublishTests.swift in Sources */,
 				C27C3C5802D5854246E3E7BF /* RichTextMarkdownConverterTests.swift in Sources */,

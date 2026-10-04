@@ -70,18 +70,11 @@ struct CreatePostView: View {
         return max(168, available)
     }
 
-    private var mentionBlockHeight: CGFloat {
-        guard !mentionPicker.users.isEmpty else { return 0 }
-        let rows = min(mentionPicker.users.count, 4)
-        return CGFloat(rows) * 52 + 8
-    }
-
     private var chromeHeight: CGFloat {
         var height = ComposerBottomChrome.toolRowHeight
         if chromeState.showFormatTools, !isPreviewMode {
             height += ComposerBottomChrome.formatRowHeight
         }
-        height += mentionBlockHeight
         return height
     }
 
@@ -197,6 +190,31 @@ struct CreatePostView: View {
                 KeyboardSafeHost(content: composerChrome)
                     .frame(height: chromeHeight)
             }
+            .overlay(alignment: .bottom) {
+                if !mentionPicker.users.isEmpty {
+                    MentionOverlayView(
+                        candidates: mentionPicker.users,
+                        query: ""
+                    ) { user in
+                        guard let range = mentionPicker.activeRange else { return }
+                        composerEditID += 1
+                        pendingEdit = PendingComposerEdit(
+                            id: composerEditID,
+                            replacement: ComposerTextReplacement(
+                                location: range.location,
+                                length: range.length,
+                                text: "@\(user.username) "
+                            )
+                        )
+                        mentionPicker.hide()
+                        editorFocusID += 1
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, chromeHeight + 8)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+            }
+            .animation(.easeInOut(duration: 0.15), value: mentionPicker.users.isEmpty)
             .onChange(of: viewModel.content) { _, newValue in
                 if newValue.isEmpty {
                     mentionPicker.hide()
@@ -280,73 +298,49 @@ struct CreatePostView: View {
     }
 
     private var composerChrome: some View {
-        VStack(spacing: 0) {
-            if !mentionPicker.users.isEmpty {
-                ScrollView {
-                    MentionAutocompleteView(users: mentionPicker.users) { user in
-                        guard let range = mentionPicker.activeRange else { return }
-                        composerEditID += 1
-                        pendingEdit = PendingComposerEdit(
-                            id: composerEditID,
-                            replacement: ComposerTextReplacement(
-                                location: range.location,
-                                length: range.length,
-                                text: "@\(user.username) "
-                            )
-                        )
-                        mentionPicker.hide()
-                        editorFocusID += 1
-                    }
-                }
-                .scrollBounceBehavior(.basedOnSize)
-                .frame(height: mentionBlockHeight)
-                .background(.regularMaterial)
-            }
-
-            ComposerBottomChrome(
-                chromeState: $chromeState,
-                isPreviewMode: isPreviewMode,
-                formatState: formatState,
-                publishState: ComposerPublishState(
-                    canSubmitContent: viewModel.canSubmitContent,
-                    isSubmitting: viewModel.isSubmitting
-                ),
-                publishTitle: viewModel.isEditing ? "Save" : "Post",
-                attachmentCount: viewModel.attachments.count,
-                maxAttachments: CreatePostViewModel.maxAttachments,
-                usedCharacters: usedCharacters,
-                characterLimit: CreatePostViewModel.characterLimit,
-                onPhotos: {
-                    guard remainingPickerSlots > 0 else { return }
-                    photosPickerPresented = true
-                },
-                onMention: {
-                    composerEditID += 1
-                    pendingEdit = PendingComposerEdit(id: composerEditID, insert: "@")
+        ComposerBottomChrome(
+            chromeState: $chromeState,
+            isPreviewMode: isPreviewMode,
+            formatState: formatState,
+            publishState: ComposerPublishState(
+                canSubmitContent: viewModel.canSubmitContent,
+                isSubmitting: viewModel.isSubmitting
+            ),
+            publishTitle: viewModel.isEditing ? "Save" : "Post",
+            attachmentCount: viewModel.attachments.count,
+            maxAttachments: CreatePostViewModel.maxAttachments,
+            usedCharacters: usedCharacters,
+            characterLimit: CreatePostViewModel.characterLimit,
+            onPhotos: {
+                guard remainingPickerSlots > 0 else { return }
+                photosPickerPresented = true
+            },
+            onMention: {
+                composerEditID += 1
+                pendingEdit = PendingComposerEdit(id: composerEditID, insert: "@")
+                editorFocusID += 1
+            },
+            onTogglePreview: {
+                isPreviewMode.toggle()
+                if isPreviewMode {
+                    chromeState.showFormatTools = false
+                } else {
                     editorFocusID += 1
-                },
-                onTogglePreview: {
-                    isPreviewMode.toggle()
-                    if isPreviewMode {
-                        chromeState.showFormatTools = false
-                    } else {
-                        editorFocusID += 1
-                    }
-                },
-                onFormatAction: { pendingFormatAction = $0 },
-                onRecordShot: {
-                    shotComposer = ShotComposerPresentation(
-                        viewModel: viewModel.makeCameraViewModel()
-                    )
-                },
-                onRemoveAllPhotos: {
-                    for attachment in viewModel.attachments {
-                        viewModel.removeAttachment(attachment)
-                    }
-                },
-                onPublish: { Task { await viewModel.submit() } }
-            )
-        }
+                }
+            },
+            onFormatAction: { pendingFormatAction = $0 },
+            onRecordShot: {
+                shotComposer = ShotComposerPresentation(
+                    viewModel: viewModel.makeCameraViewModel()
+                )
+            },
+            onRemoveAllPhotos: {
+                for attachment in viewModel.attachments {
+                    viewModel.removeAttachment(attachment)
+                }
+            },
+            onPublish: { Task { await viewModel.submit() } }
+        )
     }
 }
 

@@ -6,39 +6,7 @@ struct MentionAutocompleteView: View {
     var onSelect: (FollowUser) -> Void
 
     var body: some View {
-        if users.isEmpty {
-            EmptyView()
-        } else {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(users) { user in
-                    Button {
-                        onSelect(user)
-                    } label: {
-                        HStack(spacing: 10) {
-                            UserAvatarView(user: user.asUser(), size: 32)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(user.displayName)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.primary)
-                                Text("@\(user.username)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-
-                    if user.id != users.last?.id {
-                        Divider().padding(.leading, 54)
-                    }
-                }
-            }
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-        }
+        MentionOverlayView(candidates: users, query: "", onSelect: onSelect)
     }
 }
 
