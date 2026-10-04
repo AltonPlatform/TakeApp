@@ -11,3 +11,6 @@ AltonApp/Resources/GoogleService-Info.plist
 # Large CAS binary — restore with: Scripts/fetch-cas-binary.sh
 Vendor/CASBase/CleverAdsSolutions.xcframework/
 Vendor/CASBase/CASBaseResources.bundle/
+
+# Git worktrees for isolated feature work (SDD)
+.worktrees/
