@@ -14,6 +14,7 @@
 		0299FC25D9EC72AD8204F7CB /* AuthRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 140FC45B779554F18780A762 /* AuthRepository.swift */; };
 		035574317DE5FD459AA23BD4 /* ExposureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EFABFE56BC1E343CFE22BA5 /* ExposureController.swift */; };
 		03C15A9F1B248E3ECF404E5A /* DraftStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E9C8599DF1DEF9A72CCF469 /* DraftStoreTests.swift */; };
+		A1B2C3D4E5F6000100000002 /* KeyboardDismissControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000100000001 /* KeyboardDismissControllerTests.swift */; };
 		03EADA94EEE74B8806E44705 /* NativeAdPostCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 231C2CC48FE020B9CD961D94 /* NativeAdPostCard.swift */; };
 		0511FBD2C69E129051A2A511 /* UserHandleLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC363904B52719A1327655D /* UserHandleLabel.swift */; };
 		061CD128322DAE28F242A560 /* ImagePipelineConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74C78F5BCF2CAE2E4B893E50 /* ImagePipelineConfig.swift */; };
@@ -244,6 +245,7 @@
 		E7411FFD31F6AF6118793821 /* TimelineCellReusePool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 567686FC418DFDB9101962FF /* TimelineCellReusePool.swift */; };
 		E82CD6657A5AB081C0DD8953 /* FlashToggle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E77D3B06A43668CAE612E54 /* FlashToggle.swift */; };
 		E8C7355133D86D8E4A3A7089 /* KeyboardDismiss.swift in Sources */ = {isa = PBXBuildFile; fileRef = 316705E766D6873C940D5353 /* KeyboardDismiss.swift */; };
+		A1B2C3D4E5F6000200000002 /* LiquidGlassKeyboardDismissButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000200000001 /* LiquidGlassKeyboardDismissButton.swift */; };
 		E9E1E3AEDB40BC6E35045FB3 /* TimelineFilmstripSlot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03D4F7EACCEADA3D182595E2 /* TimelineFilmstripSlot.swift */; };
 		ED8E78C3C2FF5212FDA60495 /* CMSampleBuffer+Retiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F2DC583EAA0EA6FF2B75F62 /* CMSampleBuffer+Retiming.swift */; };
 		EECD0176119906567C748915 /* FeedItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0CC54F297536AE081EB46F8 /* FeedItem.swift */; };
@@ -361,6 +363,7 @@
 		2F46229E03DFA185E9B35958 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		30E9344043EA36A93DFF998A /* DevicePermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicePermissions.swift; sourceTree = "<group>"; };
 		316705E766D6873C940D5353 /* KeyboardDismiss.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardDismiss.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000200000001 /* LiquidGlassKeyboardDismissButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassKeyboardDismissButton.swift; sourceTree = "<group>"; };
 		31D52C1FF2A36EDA1E29707F /* ShotCommentsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShotCommentsSheet.swift; sourceTree = "<group>"; };
 		3255645CC29487E4102B395E /* CrashReporting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashReporting.swift; sourceTree = "<group>"; };
 		35AF23E1177A31045C5AECB4 /* VideoQuality.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoQuality.swift; sourceTree = "<group>"; };
@@ -420,6 +423,7 @@
 		6E4A515BF3CCE0569F476CD0 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		6E6AE7766D28DC438EC1DA5F /* CameraPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPresentation.swift; sourceTree = "<group>"; };
 		6E9C8599DF1DEF9A72CCF469 /* DraftStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftStoreTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000100000001 /* KeyboardDismissControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardDismissControllerTests.swift; sourceTree = "<group>"; };
 		6F061D716AFFE4476618AC06 /* PostRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostRepository.swift; sourceTree = "<group>"; };
 		6F0E7D6A3A62E013BDC11413 /* EditorProjectSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorProjectSnapshot.swift; sourceTree = "<group>"; };
 		6F3ADBFB7BAEC38DF6DC8A24 /* ClipFraming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipFraming.swift; sourceTree = "<group>"; };
@@ -670,6 +674,7 @@
 				C0F3E5A79D4F62B3C5A7E0F3 /* KlipyAssetPickerTests.swift */,
 				A8F1C3E57B2D4091A3E5C8D1 /* PhotoCropEditorTests.swift */,
 				6E9C8599DF1DEF9A72CCF469 /* DraftStoreTests.swift */,
+				A1B2C3D4E5F6000100000001 /* KeyboardDismissControllerTests.swift */,
 				C83AF7352891D4EFF19411DB /* NetworkSessionFactoryTests.swift */,
 				416E84B48554CDB2E8D90585 /* PostUseCaseShotPublishTests.swift */,
 				6116E5F7A297D9BB7247DC45 /* RichTextMarkdownConverterTests.swift */,
@@ -949,6 +954,7 @@
 				910534BA9289BA38D38D16F3 /* DownsampledImage.swift */,
 				564CCCACD73AA4FDF5A886AB /* ErrorView.swift */,
 				316705E766D6873C940D5353 /* KeyboardDismiss.swift */,
+				A1B2C3D4E5F6000200000001 /* LiquidGlassKeyboardDismissButton.swift */,
 				E53C7B6D812C740F0884EE12 /* LoadingView.swift */,
 				A55F1330EFEF39184EF1A1C5 /* PostActionBar.swift */,
 				8D282FCEB69B1E378BD5835D /* PostContextMenuButton.swift */,
@@ -1623,6 +1629,7 @@
 				074108300F1C54E4A7ED7EB1 /* HashtagInsertSheet.swift in Sources */,
 				061CD128322DAE28F242A560 /* ImagePipelineConfig.swift in Sources */,
 				E8C7355133D86D8E4A3A7089 /* KeyboardDismiss.swift in Sources */,
+				A1B2C3D4E5F6000200000002 /* LiquidGlassKeyboardDismissButton.swift in Sources */,
 				6AAFB0CBCD78A1AB22F2FF3F /* KeychainTokenStore.swift in Sources */,
 				29E8B4A3B99E1CCC325FC901 /* LinkPreviewView.swift in Sources */,
 				9E2C9916FFD49679B224A9A6 /* LoadingView.swift in Sources */,
@@ -1768,6 +1775,7 @@
 				B7E14A2C91D03F58A6C4E222 /* NotificationMediaPolicy.swift in Sources */,
 				B7E14A2C91D03F58A6C4E224 /* NotificationMediaPolicyTests.swift in Sources */,
 				03C15A9F1B248E3ECF404E5A /* DraftStoreTests.swift in Sources */,
+				A1B2C3D4E5F6000100000002 /* KeyboardDismissControllerTests.swift in Sources */,
 				F336066A91711BFDC4299AAF /* NetworkSessionFactoryTests.swift in Sources */,
 				C6CF1C86E64E8ECF2F23CB22 /* PostUseCaseShotPublishTests.swift in Sources */,
 				C27C3C5802D5854246E3E7BF /* RichTextMarkdownConverterTests.swift in Sources */,
