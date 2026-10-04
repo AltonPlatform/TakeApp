@@ -77,6 +77,7 @@ struct ReplyTakeView: View {
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var showGIFPicker = false
     @FocusState private var isComposerFocused: Bool
+    @State private var dismissController = KeyboardDismissController()
 
     init(
         viewModel: CommentsViewModel,
@@ -211,7 +212,7 @@ struct ReplyTakeView: View {
         }
         .navigationTitle("Reply")
         .navigationBarTitleDisplayMode(.inline)
-        .keyboardDoneButton(focus: $isComposerFocused)
+        .liquidGlassKeyboardDismiss(controller: dismissController)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {

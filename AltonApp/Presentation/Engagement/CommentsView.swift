@@ -12,6 +12,7 @@ struct CommentsView: View {
     @State private var showStickerPicker = false
     @State private var showGIFPicker = false
     @State private var reportCommentID: String?
+    @State private var dismissController = KeyboardDismissController()
 
     private var canSend: Bool {
         viewModel.canSubmitDraft
@@ -116,7 +117,7 @@ struct CommentsView: View {
                     Button("Close") { dismiss() }
                 }
             }
-            .keyboardDoneButton(focus: $isComposerFocused)
+            .liquidGlassKeyboardDismiss(controller: dismissController)
             .task {
                 viewModel.currentUserAvatarURL = session?.user.avatarURL
                 await viewModel.loadInitial()

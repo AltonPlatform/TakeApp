@@ -427,6 +427,7 @@ private struct ShotCommentsSheetContent: View {
     @State private var showStickerPicker = false
     @State private var showGIFPicker = false
     @State private var reportCommentID: String?
+    @State private var dismissController = KeyboardDismissController()
 
     init(
         viewModel: CommentsViewModel,
@@ -563,7 +564,7 @@ private struct ShotCommentsSheetContent: View {
                 composer
             }
             .navigationBarHidden(true)
-            .keyboardDoneButton(focus: $isComposerFocused)
+            .liquidGlassKeyboardDismiss(controller: dismissController)
             .onChange(of: viewModel.draft) { _, newValue in
                 mentionPicker.update(from: newValue)
             }

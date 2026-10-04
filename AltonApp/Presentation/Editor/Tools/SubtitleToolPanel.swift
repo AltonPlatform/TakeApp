@@ -4,6 +4,7 @@ struct SubtitleToolPanel: View {
     @Bindable var viewModel: EditorViewModel
     @State private var subtitleDraft: String = ""
     @State private var draftSegmentID: UUID?
+    @State private var dismissController = KeyboardDismissController()
 
     var body: some View {
         Form {
@@ -44,7 +45,7 @@ struct SubtitleToolPanel: View {
         .onAppear {
             loadDraft(from: viewModel.selectedSubtitleID)
         }
-        .keyboardDoneButton()
+        .liquidGlassKeyboardDismiss(controller: dismissController)
         .onChange(of: viewModel.selectedSubtitleID) { _, newID in
             loadDraft(from: newID)
         }

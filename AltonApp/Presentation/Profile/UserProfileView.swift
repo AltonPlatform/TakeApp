@@ -597,6 +597,7 @@ struct EditProfileView: View {
     @State private var viewModel: EditProfileViewModel
     @State private var photoItem: PhotosPickerItem?
     @State private var avatarCrop: PhotoCropDraft?
+    @State private var dismissController = KeyboardDismissController()
     let onSaved: (UserProfile) -> Void
 
     init(profile: UserProfile, userUseCase: UserUseCase, onSaved: @escaping (UserProfile) -> Void) {
@@ -711,7 +712,7 @@ struct EditProfileView: View {
                     .lineLimit(3...6)
             }
             .navigationTitle("Edit Profile")
-            .keyboardDoneButton()
+            .liquidGlassKeyboardDismiss(controller: dismissController)
             .onChange(of: photoItem) { _, item in
                 guard let item else { return }
                 Task {

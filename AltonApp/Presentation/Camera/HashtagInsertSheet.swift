@@ -4,6 +4,7 @@ struct HashtagInsertSheet: View {
     @Binding var caption: String
     @Binding var query: String
     @Environment(\.dismiss) private var dismiss
+    @State private var dismissController = KeyboardDismissController()
 
     private let suggestions = ["alton", "reels", "video", "fyp", "creator"]
 
@@ -36,7 +37,7 @@ struct HashtagInsertSheet: View {
                     Button("Close") { dismiss() }
                 }
             }
-            .keyboardDoneButton()
+            .liquidGlassKeyboardDismiss(controller: dismissController)
         }
         .presentationDetents([.medium])
     }

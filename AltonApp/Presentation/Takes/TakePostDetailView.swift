@@ -44,6 +44,7 @@ struct TakePostDetailView: View {
     @State private var mentionPicker: MentionPickerModel
     @State private var didApplyComposerFocus = false
     @FocusState private var isComposerFocused: Bool
+    @State private var dismissController = KeyboardDismissController()
     @Environment(\.dismiss) private var dismiss
 
     init(
@@ -142,7 +143,7 @@ struct TakePostDetailView: View {
         }
         .background(Color(.systemBackground))
         .navigationBarTitleDisplayMode(.inline)
-        .keyboardDoneButton(focus: $isComposerFocused)
+        .liquidGlassKeyboardDismiss(controller: dismissController)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Image("nav.take")
