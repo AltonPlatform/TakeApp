@@ -88,10 +88,10 @@ final class MarkdownEditorBindingLoopTests: XCTestCase {
         let (coordinator, textView) = makeEditor(markdown: "hello")
         textView.selectedRange = NSRange(location: 0, length: 5)
 
-        coordinator.stagePendingFormatAction(.bold)
+        coordinator.stagePendingFormatAction(PendingFormatAction(id: 1, action: .bold))
         let applied = coordinator.applyPendingFormatActionIfNeeded(to: textView)
         XCTAssertTrue(applied)
-        XCTAssertNil(coordinator.pendingFormatAction, "pendingFormatAction must be cleared synchronously")
+        XCTAssertNil(coordinator.pendingFormatAction, "local mirror must be cleared once consumed")
         XCTAssertTrue(isBold(textView, at: 0))
 
         // Nothing staged any more: a second pass must not toggle bold off again.
@@ -100,12 +100,60 @@ final class MarkdownEditorBindingLoopTests: XCTestCase {
         XCTAssertTrue(isBold(textView, at: 0), "format action must toggle exactly once")
     }
 
+    /// Behavioral proof of the `**` duplication fix. The binding clear is deferred, so a
+    /// re-entrant updateUIView pass (N+1) still sees the SAME action and re-stages it. Only the
+    /// id guard stops it being applied twice. On the pre-fix code (no `consumedFormatActionID`)
+    /// the second apply toggles bold back off, so the final assertions fail.
+    @MainActor
+    func testPendingFormatActionConsumedOnceByIdGuard() {
+        let (coordinator, textView) = makeEditor(markdown: "hello")
+        textView.selectedRange = NSRange(location: 0, length: 5)
+        let action = PendingFormatAction(id: 1, action: .bold)
+
+        // Pass N: stage + apply.
+        coordinator.stagePendingFormatAction(action)
+        XCTAssertTrue(coordinator.applyPendingFormatActionIfNeeded(to: textView))
+        XCTAssertEqual(coordinator.consumedFormatActionID, 1)
+        XCTAssertTrue(isBold(textView, at: 0))
+        let markdownAfterFirst = RichTextMarkdownConverter.markdown(from: textView.attributedText)
+        XCTAssertEqual(markdownAfterFirst, "**hello**")
+
+        // Pass N+1 before the async binding clear ran: same id re-staged.
+        coordinator.stagePendingFormatAction(action)
+        let appliedAgain = coordinator.applyPendingFormatActionIfNeeded(to: textView)
+
+        XCTAssertFalse(appliedAgain, "same id must be a no-op")
+        XCTAssertTrue(isBold(textView, at: 0), "bold must not be toggled back off by the duplicate")
+        XCTAssertEqual(
+            RichTextMarkdownConverter.markdown(from: textView.attributedText),
+            markdownAfterFirst,
+            "a re-delivered action must never re-apply / duplicate markers"
+        )
+        XCTAssertNil(coordinator.pendingFormatAction)
+    }
+
+    @MainActor
+    func testNewerFormatActionIDIsStillApplied() {
+        let (coordinator, textView) = makeEditor(markdown: "hello")
+        textView.selectedRange = NSRange(location: 0, length: 5)
+
+        coordinator.stagePendingFormatAction(PendingFormatAction(id: 1, action: .bold))
+        coordinator.applyPendingFormatActionIfNeeded(to: textView)
+        // A genuine second tap (new id) must toggle bold off again.
+        coordinator.stagePendingFormatAction(PendingFormatAction(id: 2, action: .bold))
+        let applied = coordinator.applyPendingFormatActionIfNeeded(to: textView)
+
+        XCTAssertTrue(applied)
+        XCTAssertEqual(coordinator.consumedFormatActionID, 2)
+        XCTAssertFalse(isBold(textView, at: 0))
+    }
+
     @MainActor
     func testStaleFormatActionIgnored() {
         let (coordinator, textView) = makeEditor(markdown: "hello")
         textView.selectedRange = NSRange(location: 0, length: 5)
 
-        coordinator.stagePendingFormatAction(.bold)
+        coordinator.stagePendingFormatAction(PendingFormatAction(id: 1, action: .bold))
         coordinator.bumpToken()
         let applied = coordinator.applyPendingFormatActionIfNeeded(to: textView)
 

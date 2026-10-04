@@ -19,7 +19,8 @@ struct CreatePostView: View {
     @State private var shotComposer: ShotComposerPresentation?
     @State private var dismissTask: Task<Void, Never>?
     @State private var mentionPicker: MentionPickerModel
-    @State private var pendingFormatAction: RichTextFormatAction?
+    @State private var pendingFormatAction: PendingFormatAction?
+    @State private var formatActionID: UInt64 = 0
     @State private var chromeState = ComposerChromeState()
     @State private var formatState = RichTextFormatState()
     @State private var photosPickerPresented = false
@@ -334,7 +335,10 @@ struct CreatePostView: View {
                     editorFocusID += 1
                 }
             },
-            onFormatAction: { pendingFormatAction = $0 },
+            onFormatAction: { action in
+                formatActionID += 1
+                pendingFormatAction = PendingFormatAction(id: formatActionID, action: action)
+            },
             onRecordShot: {
                 shotComposer = ShotComposerPresentation(
                     viewModel: viewModel.makeCameraViewModel()

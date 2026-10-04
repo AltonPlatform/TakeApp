@@ -1,6 +1,14 @@
 import SwiftUI
 import UIKit
 
+/// A format action staged by the composer chrome. The monotonic `id` lets the editor
+/// de-duplicate it (like `PendingComposerEdit.id`) when the binding is still set on a
+/// re-entrant `updateUIView` pass before the deferred binding clear has landed.
+struct PendingFormatAction: Equatable {
+    var id: UInt64
+    var action: RichTextFormatAction
+}
+
 struct MarkdownEditorView: View {
     @Binding var text: String
     @Binding var isPreviewMode: Bool
@@ -16,7 +24,7 @@ struct MarkdownEditorView: View {
     var onSelectionLengthChange: (Int) -> Void = { _ in }
     var onPlainCaretChange: (String, Int) -> Void = { _, _ in }
     @Binding var pendingEdit: PendingComposerEdit?
-    @Binding var pendingFormatAction: RichTextFormatAction?
+    @Binding var pendingFormatAction: PendingFormatAction?
 
     enum MarkdownEditorStyle {
         case boxed
@@ -43,7 +51,7 @@ struct MarkdownEditorView: View {
         onSelectionLengthChange: @escaping (Int) -> Void = { _ in },
         onPlainCaretChange: @escaping (String, Int) -> Void = { _, _ in },
         pendingEdit: Binding<PendingComposerEdit?> = .constant(nil),
-        pendingFormatAction: Binding<RichTextFormatAction?> = .constant(nil)
+        pendingFormatAction: Binding<PendingFormatAction?> = .constant(nil)
     ) {
         _text = text
         _isPreviewMode = isPreviewMode
@@ -220,7 +228,7 @@ struct RichTextEditorView: UIViewRepresentable {
     var markdownSource: String
     @Binding var pasteCodeHint: RichTextPasteCodeHint?
     @Binding var applyPasteCodeHint: Bool
-    @Binding var pendingFormatAction: RichTextFormatAction?
+    @Binding var pendingFormatAction: PendingFormatAction?
     var style: MarkdownEditorView.MarkdownEditorStyle = .boxed
     var autoFocus = false
     var expandsToFitContent = false
@@ -304,11 +312,18 @@ struct RichTextEditorView: UIViewRepresentable {
         context.coordinator.bumpToken()
         context.coordinator.importExternalMarkdownIfNeeded(markdownSource, into: textView)
         if let edit = pendingEdit {
-            // Consume synchronously: stage, apply, and clear the binding in this same pass
-            // so a re-entrant updateUIView can never re-apply the edit (binding-loop race).
+            // Stage + apply in this pass. Re-application in a re-entrant pass (binding not yet
+            // cleared) is prevented by the id guard (`consumedEditID`), NOT by clearing the
+            // binding here: writing @State during updateUIView is illegal ("modifying state
+            // during view update"), so the binding clear is deferred. Only clear if the binding
+            // still holds *this* edit - a newer edit staged in the meantime must survive.
             context.coordinator.stagePendingEdit(edit)
             context.coordinator.applyPendingEditIfNeeded(to: textView)
-            pendingEdit = nil
+            DispatchQueue.main.async {
+                if pendingEdit?.id == edit.id {
+                    pendingEdit = nil
+                }
+            }
         }
 
         if applyPasteCodeHint {
@@ -319,10 +334,15 @@ struct RichTextEditorView: UIViewRepresentable {
         }
 
         if let action = pendingFormatAction {
-            // Same synchronous stage -> apply -> clear sequence as pendingEdit.
+            // Same stage -> apply -> deferred-clear sequence as pendingEdit; the id guard
+            // (`consumedFormatActionID`) is what prevents double-application.
             context.coordinator.stagePendingFormatAction(action)
             context.coordinator.applyPendingFormatActionIfNeeded(to: textView)
-            pendingFormatAction = nil
+            DispatchQueue.main.async {
+                if pendingFormatAction?.id == action.id {
+                    pendingFormatAction = nil
+                }
+            }
         }
     }
 
@@ -347,6 +367,9 @@ struct RichTextEditorView: UIViewRepresentable {
         var onPlainCaretChange: (String, Int) -> Void
         var onHeightChange: (CGFloat) -> Void
         var consumedEditID = 0
+        /// Highest format-action id already applied; anything `<=` is a duplicate (the binding
+        /// clear is deferred, so a re-entrant pass can still see the same action).
+        private(set) var consumedFormatActionID: UInt64 = 0
         var lastExportedMarkdown = ""
         var characterLimit = 0
         var lastFocusRequestID = 0
@@ -362,10 +385,16 @@ struct RichTextEditorView: UIViewRepresentable {
         private(set) var pendingFormatToken: UInt64 = 0
         /// True while local (typed / applied) mutations have not yet been echoed to the binding.
         /// While true the editor's text is the source of truth and external imports are skipped.
+        ///
+        /// NOTE: currently this duplicates `isExporting` exactly (set together, cleared together,
+        /// zero behavioral difference). The spec intended it to detect *external* `string`
+        /// changes via the token gate; that is deferred to the final whole-branch review, which
+        /// decides whether to make it meaningful or collapse it into `isExporting`.
         private(set) var isAuthoritative = false
         private(set) var pendingEdit: PendingComposerEdit?
-        private(set) var pendingFormatAction: RichTextFormatAction?
-        private var unconsumedLocalMutations = 0
+        private(set) var pendingFormatAction: PendingFormatAction?
+        /// Number of exports queued to the binding that have not landed yet.
+        private var inFlightExports = 0
 
         private var previousSelection = NSRange(location: 0, length: 0)
         private var isRestoringSelection = false
@@ -399,6 +428,8 @@ struct RichTextEditorView: UIViewRepresentable {
             currentToken &+= 1
         }
 
+        /// Test-only hook: forces the ownership flag. Not called from production code; prod sets
+        /// it in `textViewDidChange` / the begin/end editing delegate callbacks.
         func setAuthoritative(_ value: Bool) {
             isAuthoritative = value
         }
@@ -408,8 +439,11 @@ struct RichTextEditorView: UIViewRepresentable {
             pendingEditToken = currentToken
         }
 
-        /// Consumes the staged edit synchronously. Always clears it; applies only when it is
-        /// fresh (staged in the current pass) and has not been applied before.
+        /// Consumes the staged edit. The local mirror is always cleared (benign: a Coordinator
+        /// property, not SwiftUI state). Applies only when it is fresh and its id has not been
+        /// applied before. The id guard (`consumedEditID`) is the real defense against
+        /// re-application when the `@Binding` clear is deferred; the token gate is a second
+        /// layer that discards an edit staged in an earlier `updateUIView` pass.
         @discardableResult
         func applyPendingEditIfNeeded(to textView: UITextView) -> Bool {
             guard let edit = pendingEdit else { return false }
@@ -421,16 +455,21 @@ struct RichTextEditorView: UIViewRepresentable {
             return true
         }
 
-        func stagePendingFormatAction(_ action: RichTextFormatAction?) {
+        func stagePendingFormatAction(_ action: PendingFormatAction?) {
             pendingFormatAction = action
             pendingFormatToken = currentToken
         }
 
+        /// Consumes the staged format action. Same contract as `applyPendingEditIfNeeded`:
+        /// the id guard (`consumedFormatActionID`) makes a re-delivered action a no-op.
         @discardableResult
         func applyPendingFormatActionIfNeeded(to textView: RichTextTextView) -> Bool {
-            guard let action = pendingFormatAction else { return false }
+            guard let pending = pendingFormatAction else { return false }
             pendingFormatAction = nil
             guard pendingFormatToken >= currentToken else { return false }
+            guard pending.id > consumedFormatActionID else { return false }
+            consumedFormatActionID = pending.id
+            let action = pending.action
             if !textView.isFirstResponder {
                 textView.becomeFirstResponder()
             }
@@ -532,10 +571,15 @@ struct RichTextEditorView: UIViewRepresentable {
         }
 
         func importExternalMarkdownIfNeeded(_ markdown: String, into textView: RichTextTextView) {
-            let live = RichTextMarkdownConverter.markdown(
-                from: textView.attributedText ?? RichTextStyle.emptyDocument()
+            // `live` is a full attributed-string -> markdown traversal; it is lazy so the early
+            // return below (every keystroke during an export burst) never pays for it.
+            performImport(
+                markdown,
+                live: RichTextMarkdownConverter.markdown(
+                    from: textView.attributedText ?? RichTextStyle.emptyDocument()
+                ),
+                into: textView
             )
-            performImport(markdown, live: live, into: textView)
         }
 
         /// Testable core: `current` is the editor's live markdown.
@@ -544,8 +588,13 @@ struct RichTextEditorView: UIViewRepresentable {
             performImport(newMarkdown, live: current, into: textView)
         }
 
-        private func performImport(_ markdown: String, live: String, into textView: RichTextTextView) {
+        private func performImport(
+            _ markdown: String,
+            live liveProvider: @autoclosure () -> String,
+            into textView: RichTextTextView
+        ) {
             if isExporting || isImporting || isAuthoritative { return }
+            let live = liveProvider()
 
             if live == markdown || markdown == lastExportedMarkdown {
                 lastExportedMarkdown = live
@@ -691,7 +740,7 @@ struct RichTextEditorView: UIViewRepresentable {
             let publish = onMarkdownChange
             // Count in-flight exports: with rapid edits an earlier export landing must not
             // release ownership while later ones are still queued.
-            unconsumedLocalMutations += 1
+            inFlightExports += 1
             isAuthoritative = true
             isExporting = true
             DispatchQueue.main.async {
@@ -700,8 +749,8 @@ struct RichTextEditorView: UIViewRepresentable {
                 if wasPaste {
                     self.pasteCodeHint = hint
                 }
-                self.unconsumedLocalMutations = max(self.unconsumedLocalMutations - 1, 0)
-                if self.unconsumedLocalMutations == 0 {
+                self.inFlightExports = max(self.inFlightExports - 1, 0)
+                if self.inFlightExports == 0 {
                     self.isExporting = false
                     self.isAuthoritative = false
                 }
@@ -709,11 +758,11 @@ struct RichTextEditorView: UIViewRepresentable {
         }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
-            isAuthoritative = unconsumedLocalMutations > 0
+            isAuthoritative = inFlightExports > 0
         }
 
         func textViewDidEndEditing(_ textView: UITextView) {
-            isAuthoritative = unconsumedLocalMutations > 0
+            isAuthoritative = inFlightExports > 0
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
