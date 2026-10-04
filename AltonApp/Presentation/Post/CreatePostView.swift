@@ -20,7 +20,7 @@ struct CreatePostView: View {
     @State private var dismissTask: Task<Void, Never>?
     @State private var mentionPicker: MentionPickerModel
     @State private var pendingFormatAction: RichTextFormatAction?
-    @State private var showFormatTools = false
+    @State private var chromeState = ComposerChromeState()
     @State private var formatState = RichTextFormatState()
     @State private var photosPickerPresented = false
     @State private var activeCrop: PhotoCropDraft?
@@ -77,9 +77,9 @@ struct CreatePostView: View {
     }
 
     private var chromeHeight: CGFloat {
-        var height: CGFloat = 57
-        if showFormatTools, !isPreviewMode {
-            height += 46
+        var height = ComposerBottomChrome.toolRowHeight
+        if chromeState.showFormatTools, !isPreviewMode {
+            height += ComposerBottomChrome.formatRowHeight
         }
         height += mentionBlockHeight
         return height
@@ -110,9 +110,9 @@ struct CreatePostView: View {
                                 focusRequestID: editorFocusID,
                                 onFormatStateChange: { formatState = $0 },
                                 onSelectionLengthChange: { length in
-                                    guard length > 0, !isPreviewMode, !showFormatTools else { return }
+                                    guard length > 0, !isPreviewMode, !chromeState.showFormatTools else { return }
                                     withAnimation(.easeInOut(duration: 0.15)) {
-                                        showFormatTools = true
+                                        chromeState.showFormatTools = true
                                     }
                                 },
                                 onPlainCaretChange: { plain, caret in
@@ -300,209 +300,53 @@ struct CreatePostView: View {
                 }
                 .scrollBounceBehavior(.basedOnSize)
                 .frame(height: mentionBlockHeight)
+                .background(.regularMaterial)
             }
-
-            if showFormatTools && !isPreviewMode {
-                formatToolbar
-            }
-
-            Divider()
 
             ComposerBottomChrome(
+                chromeState: $chromeState,
+                isPreviewMode: isPreviewMode,
+                formatState: formatState,
                 publishState: ComposerPublishState(
                     canSubmitContent: viewModel.canSubmitContent,
                     isSubmitting: viewModel.isSubmitting
                 ),
                 publishTitle: viewModel.isEditing ? "Save" : "Post",
-                onPublish: { Task { await viewModel.submit() } }
-            ) {
-                HStack(spacing: 0) {
-                    photosToolButton
-                    formatToggleButton
-                    mentionToolButton
-                    previewToolButton
-                    moreToolsMenu
-
-                    Spacer(minLength: 8)
-
-                    characterMeter
-                }
-            }
-        }
-        .background(.bar)
-    }
-
-    private var formatToolbar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 2) {
-                ForEach(inlineFormatActions) { action in
-                    formatButton(action)
-                }
-
-                Divider()
-                    .frame(height: 18)
-                    .padding(.horizontal, 6)
-
-                ForEach(blockFormatActions) { action in
-                    formatButton(action)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-        }
-    }
-
-    private var inlineFormatActions: [RichTextFormatAction] {
-        [.bold, .italic, .underline, .strikethrough, .spoiler, .code, .link]
-    }
-
-    private var blockFormatActions: [RichTextFormatAction] {
-        [.quote, .bulletList, .numberedList, .codeBlock]
-    }
-
-    private func formatButton(_ action: RichTextFormatAction) -> some View {
-        let isOn = formatState.isActive(action)
-        return Button {
-            UISelectionFeedbackGenerator().selectionChanged()
-            pendingFormatAction = action
-        } label: {
-            Image(systemName: action.icon)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(isOn ? Color.accentColor : Color.primary)
-                .frame(width: 36, height: 32)
-                .background(
-                    isOn ? Color.accentColor.opacity(0.16) : Color.clear,
-                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(action.title)
-        .accessibilityAddTraits(isOn ? .isSelected : [])
-    }
-
-    private var photosToolButton: some View {
-        Button {
-            guard remainingPickerSlots > 0 else { return }
-            photosPickerPresented = true
-        } label: {
-            bottomToolIcon(
-                "photo.on.rectangle.angled",
-                emphasized: !viewModel.attachments.isEmpty
-            )
-        }
-        .disabled(remainingPickerSlots == 0 || isPreviewMode)
-        .accessibilityLabel("Add photos")
-        .accessibilityValue("\(viewModel.attachments.count) of \(CreatePostViewModel.maxAttachments)")
-    }
-
-    private var formatToggleButton: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.15)) {
-                showFormatTools.toggle()
-            }
-        } label: {
-            bottomToolIcon(
-                "textformat",
-                emphasized: showFormatTools
-            )
-        }
-        .disabled(isPreviewMode)
-        .accessibilityLabel("Formatting")
-    }
-
-    private var mentionToolButton: some View {
-        Button {
-            composerEditID += 1
-            pendingEdit = PendingComposerEdit(id: composerEditID, insert: "@")
-            editorFocusID += 1
-        } label: {
-            bottomToolIcon("at")
-        }
-        .disabled(isPreviewMode)
-        .accessibilityLabel("Mention user")
-    }
-
-    private var previewToolButton: some View {
-        Button {
-            isPreviewMode.toggle()
-            if isPreviewMode {
-                showFormatTools = false
-            } else {
-                editorFocusID += 1
-            }
-        } label: {
-            bottomToolIcon(isPreviewMode ? "pencil" : "eye", emphasized: isPreviewMode)
-        }
-        .accessibilityLabel(isPreviewMode ? "Edit text" : "Preview")
-    }
-
-    private var moreToolsMenu: some View {
-        Menu {
-            Button {
-                shotComposer = ShotComposerPresentation(
-                    viewModel: viewModel.makeCameraViewModel()
-                )
-            } label: {
-                Label("Record shot", systemImage: "video")
-            }
-
-            if !viewModel.attachments.isEmpty {
-                Button(role: .destructive) {
+                attachmentCount: viewModel.attachments.count,
+                maxAttachments: CreatePostViewModel.maxAttachments,
+                usedCharacters: usedCharacters,
+                characterLimit: CreatePostViewModel.characterLimit,
+                onPhotos: {
+                    guard remainingPickerSlots > 0 else { return }
+                    photosPickerPresented = true
+                },
+                onMention: {
+                    composerEditID += 1
+                    pendingEdit = PendingComposerEdit(id: composerEditID, insert: "@")
+                    editorFocusID += 1
+                },
+                onTogglePreview: {
+                    isPreviewMode.toggle()
+                    if isPreviewMode {
+                        chromeState.showFormatTools = false
+                    } else {
+                        editorFocusID += 1
+                    }
+                },
+                onFormatAction: { pendingFormatAction = $0 },
+                onRecordShot: {
+                    shotComposer = ShotComposerPresentation(
+                        viewModel: viewModel.makeCameraViewModel()
+                    )
+                },
+                onRemoveAllPhotos: {
                     for attachment in viewModel.attachments {
                         viewModel.removeAttachment(attachment)
                     }
-                } label: {
-                    Label("Remove all photos", systemImage: "trash")
-                }
-            }
-        } label: {
-            bottomToolIcon("ellipsis.circle")
+                },
+                onPublish: { Task { await viewModel.submit() } }
+            )
         }
-        .accessibilityLabel("More options")
-    }
-
-    private var characterMeter: some View {
-        let remaining = viewModel.remainingCharacters
-        let limit = CreatePostViewModel.characterLimit
-        let progress = min(max(Double(usedCharacters) / Double(limit), 0), 1)
-
-        return HStack(spacing: 6) {
-            if remaining <= 400 {
-                ZStack {
-                    Circle()
-                        .stroke(Color(.tertiarySystemFill), lineWidth: 2.5)
-                    Circle()
-                        .trim(from: 0, to: progress)
-                        .stroke(characterCountColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                }
-                .frame(width: 18, height: 18)
-                .accessibilityHidden(true)
-
-                if remaining < 200 {
-                    Text("\(remaining)")
-                        .font(.caption.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(characterCountColor)
-                        .padding(.trailing, 6)
-                }
-            }
-        }
-        .accessibilityLabel("\(usedCharacters) of \(limit) characters")
-    }
-
-    private var characterCountColor: Color {
-        if viewModel.remainingCharacters < 0 { return .red }
-        if viewModel.remainingCharacters < 200 { return .orange }
-        return .secondary
-    }
-
-    private func bottomToolIcon(_ systemName: String, emphasized: Bool = false) -> some View {
-        Image(systemName: systemName)
-            .font(.body)
-            .foregroundStyle(emphasized ? Color.accentColor : Color.primary)
-            .frame(width: 40, height: 40)
-            .contentShape(Rectangle())
     }
 }
 
