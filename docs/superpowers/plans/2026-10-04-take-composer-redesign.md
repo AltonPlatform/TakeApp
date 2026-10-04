@@ -86,7 +86,7 @@ final class KeyboardDismissControllerTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/KeyboardDismissControllerTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/KeyboardDismissControllerTests`
 Expected: FAIL — `KeyboardDismissController` not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -152,7 +152,7 @@ extension View {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/KeyboardDismissControllerTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/KeyboardDismissControllerTests`
 Expected: PASS.
 
 - [ ] **Step 5: Manual UI verification**
@@ -197,7 +197,7 @@ final class ComposerBottomChromeStateTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/ComposerBottomChromeStateTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/ComposerBottomChromeStateTests`
 Expected: FAIL — `ComposerPublishState` not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -211,7 +211,7 @@ In `CreatePostView.swift`:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/ComposerBottomChromeStateTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/ComposerBottomChromeStateTests`
 Expected: PASS.
 
 - [ ] **Step 5: Manual UI verification**
@@ -252,7 +252,7 @@ func testFormatToggleFlipsShowFormatTools() {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/ComposerBottomChromeStateTests/testFormatToggleFlipsShowFormatTools`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/ComposerBottomChromeStateTests/testFormatToggleFlipsShowFormatTools`
 Expected: FAIL — `ComposerChromeState.toggleFormat` not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -273,7 +273,7 @@ Replace `composerChrome` in `CreatePostView` with `ComposerBottomChrome(...)` pa
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/ComposerBottomChromeStateTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/ComposerBottomChromeStateTests`
 Expected: PASS.
 
 - [ ] **Step 5: Manual UI verification (the success criterion)**
@@ -327,7 +327,7 @@ extension MentionCandidate {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/MentionOverlayStateTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/MentionOverlayStateTests`
 Expected: FAIL — `MentionOverlayState` not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -342,7 +342,7 @@ In `CreatePostView`:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/MentionOverlayStateTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/MentionOverlayStateTests`
 Expected: PASS.
 
 - [ ] **Step 5: Manual UI verification**
@@ -403,7 +403,7 @@ final class AttachmentReorderTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/AttachmentReorderTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/AttachmentReorderTests`
 Expected: FAIL — `AttachmentReorder` not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -424,7 +424,7 @@ Do **not** add `moveAttachment` / `removeAttachment` to `CreatePostViewModel` �
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/AttachmentReorderTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/AttachmentReorderTests`
 Expected: PASS.
 
 - [ ] **Step 5: Manual UI verification**
@@ -477,7 +477,7 @@ final class LiquidGlassDismissAdoptionTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/LiquidGlassDismissAdoptionTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/LiquidGlassDismissAdoptionTests`
 Expected: FAIL — types may not exist yet or still use `.keyboardDoneButton()`.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -486,7 +486,7 @@ In each composer view: replace `.keyboardDoneButton()` with `.liquidGlassKeyboar
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/LiquidGlassDismissAdoptionTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/LiquidGlassDismissAdoptionTests`
 Expected: PASS.
 
 - [ ] **Step 5: Manual UI verification**
@@ -561,7 +561,7 @@ final class MarkdownEditorBindingLoopTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/MarkdownEditorBindingLoopTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/MarkdownEditorBindingLoopTests`
 Expected: FAIL — `applyPendingEditIfNeeded`, `currentToken`, `bumpToken`, `isAuthoritative`, `setAuthoritative`, `importExternalMarkdownIfNeeded` (testable form) not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -579,7 +579,7 @@ In `Coordinator`:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/MarkdownEditorBindingLoopTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/MarkdownEditorBindingLoopTests`
 Expected: PASS.
 
 - [ ] **Step 5: Manual UI verification**
@@ -628,7 +628,7 @@ final class MonochromeColorPassTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/MonochromeColorPassTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/MonochromeColorPassTests`
 Expected: FAIL — `ComposerPalette` not found.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -639,7 +639,7 @@ Replace every `Color.blue` / `.tint(.blue)` / `.accentColor(.blue)` in the compo
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:AltonAppTests/MonochromeColorPassTests`
+Run: `xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max' -only-testing:AltonAppTests/MonochromeColorPassTests`
 Expected: PASS.
 
 - [ ] **Step 5: Manual UI verification**
@@ -662,7 +662,7 @@ After all tasks land, run the full suite and the manual success criterion one mo
 - [ ] **Full test suite passes**
 
 ```bash
-xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16'
+xcodebuild test -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max'
 ```
 
 Expected: all tests green, no regressions in `RichTextMarkdownConverterTests`, `DraftStoreTests`, or any existing composer tests.
@@ -695,7 +695,7 @@ Expected: no new placeholders introduced by this plan.
 - [ ] **Type consistency**
 
 ```bash
-xcodebuild build -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 16'
+xcodebuild build -scheme AltonApp -destination 'platform=iOS Simulator,name=iPhone 18 Pro Max'
 ```
 Expected: builds with no warnings about the new types.
 
