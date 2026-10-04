@@ -137,7 +137,8 @@ struct CreatePostView: View {
                                         withAnimation(.snappy) {
                                             viewModel.attachments = AttachmentReorder.move(viewModel.attachments, from: from, to: to)
                                         }
-                                    }
+                                    },
+                                    style: .takeComposer
                                 )
                                 .padding(.top, 14)
                             }

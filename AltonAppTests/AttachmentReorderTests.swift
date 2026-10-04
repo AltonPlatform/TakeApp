@@ -46,15 +46,33 @@ final class AttachmentReorderTests: XCTestCase {
     }
 
     @MainActor
+    func testStripDefaultsToLegacyStyle() {
+        // Comment/reply screens rely on the default; they must keep the pre-redesign look.
+        let strip = ComposerAttachmentStrip(attachments: [], onRemove: { _ in })
+        XCTAssertEqual(strip.style, .legacy)
+    }
+
+    @MainActor
     func testStripBuildsForCounts0_1_4_10() {
-        for count in [0, 1, 4, 10] {
-            let items = (0..<count).map {
-                PostAttachment(data: Data(), contentType: "image/jpeg", filename: "\($0).jpg")
+        for style in [AttachmentStripStyle.legacy, .takeComposer] {
+            for count in [0, 1, 4, 10] {
+                let items = (0..<count).map {
+                    PostAttachment(data: Data(), contentType: "image/jpeg", filename: "\($0).jpg")
+                }
+                let strip = ComposerAttachmentStrip(
+                    attachments: items,
+                    onRemove: { _ in },
+                    onMove: { _, _ in },
+                    style: style
+                )
+                // Smoke: the strip builds for each style/count; layout is verified manually.
+                _ = strip.body
+                XCTAssertEqual(strip.style, style)
+                XCTAssertEqual(strip.attachments.count, count)
+                if count > 0 {
+                    XCTAssertEqual(AttachmentReorder.remove(strip.attachments, at: 0).count, count - 1)
+                }
             }
-            let strip = ComposerAttachmentStrip(attachments: items, onRemove: { _ in }, onMove: { _, _ in })
-            // Smoke: the strip builds for each count; layout is verified manually.
-            _ = strip.body
-            XCTAssertEqual(items.count, count)
         }
     }
 }
