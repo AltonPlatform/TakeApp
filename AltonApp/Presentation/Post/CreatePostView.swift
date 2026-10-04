@@ -28,6 +28,7 @@ struct CreatePostView: View {
     @State private var composerViewportHeight: CGFloat = 0
     @State private var pendingEdit: PendingComposerEdit?
     @State private var composerEditID = 0
+    @State private var dismissController = KeyboardDismissController()
 
     init(
         viewModel: CreatePostViewModel,
@@ -48,10 +49,6 @@ struct CreatePostView: View {
 
     private var showsDismissControl: Bool {
         presentation == .sheet || presentation == .fullScreen
-    }
-
-    private var canPublish: Bool {
-        !viewModel.isSubmitting && viewModel.canSubmitContent
     }
 
     private var navigationTitle: String {
@@ -184,7 +181,7 @@ struct CreatePostView: View {
             }
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .keyboardDoneButton()
+            .liquidGlassKeyboardDismiss(controller: dismissController)
             .toolbar {
                 if showsDismissControl {
                     ToolbarItem(placement: .cancellationAction) {
@@ -194,20 +191,6 @@ struct CreatePostView: View {
                         }
                         .disabled(viewModel.isSubmitting)
                     }
-                }
-
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        Task { await viewModel.submit() }
-                    } label: {
-                        if viewModel.isSubmitting {
-                            ProgressView()
-                        } else {
-                            Text(viewModel.isEditing ? "Save" : "Post")
-                                .fontWeight(.semibold)
-                        }
-                    }
-                    .disabled(!canPublish)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -325,19 +308,26 @@ struct CreatePostView: View {
 
             Divider()
 
-            HStack(spacing: 0) {
-                photosToolButton
-                formatToggleButton
-                mentionToolButton
-                previewToolButton
-                moreToolsMenu
+            ComposerBottomChrome(
+                publishState: ComposerPublishState(
+                    canSubmitContent: viewModel.canSubmitContent,
+                    isSubmitting: viewModel.isSubmitting
+                ),
+                publishTitle: viewModel.isEditing ? "Save" : "Post",
+                onPublish: { Task { await viewModel.submit() } }
+            ) {
+                HStack(spacing: 0) {
+                    photosToolButton
+                    formatToggleButton
+                    mentionToolButton
+                    previewToolButton
+                    moreToolsMenu
 
-                Spacer(minLength: 8)
+                    Spacer(minLength: 8)
 
-                characterMeter
+                    characterMeter
+                }
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
         }
         .background(.bar)
     }
