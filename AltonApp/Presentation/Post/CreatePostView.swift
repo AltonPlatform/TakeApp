@@ -132,7 +132,12 @@ struct CreatePostView: View {
                                     },
                                     onAddPhotos: remainingPickerSlots > 0
                                         ? { photosPickerPresented = true }
-                                        : nil
+                                        : nil,
+                                    onMove: { from, to in
+                                        withAnimation(.snappy) {
+                                            viewModel.attachments = AttachmentReorder.move(viewModel.attachments, from: from, to: to)
+                                        }
+                                    }
                                 )
                                 .padding(.top, 14)
                             }

@@ -8,32 +8,40 @@ struct ComposerAttachmentStrip: View {
     var onRemove: (PostAttachment) -> Void
     var onEdit: ((PostAttachment) -> Void)? = nil
     var onAddPhotos: (() -> Void)? = nil
+    /// Drag-and-drop reorder (`from`, `to` indices). Nil disables dragging.
+    /// The owner applies it with `AttachmentReorder.move` to its own attachments storage.
+    var onMove: ((Int, Int) -> Void)? = nil
 
     private let thumbSize: CGFloat = 88
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
-                ForEach(attachments) { attachment in
+                ForEach(Array(attachments.enumerated()), id: \.element.id) { index, attachment in
                     ComposerAttachmentThumb(
                         attachment: attachment,
                         size: thumbSize,
                         onRemove: { onRemove(attachment) },
                         onEdit: attachment.playsAsAnimation ? nil : { onEdit?(attachment) }
                     )
+                    .reorderable(index: index, onMove: onMove)
                 }
 
                 if remainingSlots > 0, let onAddPhotos {
                     Button(action: onAddPhotos) {
                         VStack(spacing: 6) {
-                            Image(systemName: "plus")
-                                .font(.title3.weight(.semibold))
+                            AttachmentStripGlyph(kind: .plus)
+                                .stroke(AttachmentStripStyle.addForeground, style: AttachmentStripStyle.glyphStroke)
+                                .frame(width: 22, height: 22)
                             Text("Add")
                                 .font(.caption2.weight(.semibold))
+                                .foregroundStyle(AttachmentStripStyle.addForeground)
                         }
-                        .foregroundStyle(.secondary)
                         .frame(width: thumbSize, height: thumbSize)
-                        .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(
+                            AttachmentStripStyle.addBackground,
+                            in: RoundedRectangle(cornerRadius: AttachmentStripStyle.cornerRadius, style: .continuous)
+                        )
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Add photos")
@@ -82,10 +90,10 @@ private struct ComposerAttachmentThumb: View {
             }
             .frame(width: size, height: size)
             .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AttachmentStripStyle.cornerRadius, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color(.separator).opacity(0.45), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: AttachmentStripStyle.cornerRadius, style: .continuous)
+                    .strokeBorder(AttachmentStripStyle.border, lineWidth: 0.5)
             }
             .contentShape(Rectangle())
             .onTapGesture {
@@ -105,12 +113,21 @@ private struct ComposerAttachmentThumb: View {
             }
 
             Button(action: onRemove) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.body)
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, .black.opacity(0.55))
+                ZStack {
+                    Circle()
+                        .fill(AttachmentStripStyle.removeBackground)
+                        .overlay(Circle().strokeBorder(AttachmentStripStyle.border, lineWidth: 0.5))
+                    AttachmentStripGlyph(kind: .xmark)
+                        .stroke(AttachmentStripStyle.removeForeground, style: AttachmentStripStyle.glyphStroke)
+                        .padding(5)
+                }
+                .frame(width: 18, height: 18)
+                // Keep a comfortable touch target around the small circle.
+                .padding(6)
+                .contentShape(Rectangle())
             }
-            .offset(x: 6, y: -6)
+            .buttonStyle(.plain)
+            .padding(2)
             .accessibilityLabel("Remove photo")
         }
         .frame(width: size, height: size)
@@ -151,6 +168,99 @@ private struct ComposerAttachmentThumb: View {
         guard let gifTempURL else { return }
         try? FileManager.default.removeItem(at: gifTempURL)
         self.gifTempURL = nil
+    }
+}
+
+// MARK: - Reorder
+
+/// Pure helpers for reordering/removing attachments (testable without UI).
+enum AttachmentReorder {
+    /// Removes the element at `from` and inserts it at `to`.
+    /// Out-of-bounds indices return `items` unchanged.
+    static func move<T>(_ items: [T], from: Int, to: Int) -> [T] {
+        guard items.indices.contains(from), items.indices.contains(to), from != to else { return items }
+        var result = items
+        let element = result.remove(at: from)
+        result.insert(element, at: to)
+        return result
+    }
+
+    /// Removes the element at `index`. Out-of-bounds returns `items` unchanged.
+    static func remove<T>(_ items: [T], at index: Int) -> [T] {
+        guard items.indices.contains(index) else { return items }
+        var result = items
+        result.remove(at: index)
+        return result
+    }
+
+    /// Drag payload for a thumb index. Prefixed so unrelated dropped text is never read as an index.
+    private static let payloadPrefix = "alton.attachment-index:"
+
+    static func payload(forIndex index: Int) -> String { payloadPrefix + String(index) }
+
+    static func index(fromPayload payload: String) -> Int? {
+        guard payload.hasPrefix(payloadPrefix) else { return nil }
+        return Int(payload.dropFirst(payloadPrefix.count))
+    }
+}
+
+private extension View {
+    /// Adds `.draggable` + `.dropDestination` index-based reorder when `onMove` is set.
+    @ViewBuilder
+    func reorderable(index: Int, onMove: ((Int, Int) -> Void)?) -> some View {
+        if let onMove {
+            self
+                .draggable(AttachmentReorder.payload(forIndex: index))
+                .dropDestination(for: String.self) { payloads, _ in
+                    guard let payload = payloads.first,
+                          let from = AttachmentReorder.index(fromPayload: payload)
+                    else { return false }
+                    onMove(from, index)
+                    return true
+                }
+        } else {
+            self
+        }
+    }
+}
+
+// MARK: - Style
+
+/// Fixed light tokens per the take-composer design; Task 8 folds these into `ComposerPalette`.
+private enum AttachmentStripStyle {
+    static let cornerRadius: CGFloat = 8
+    /// `#eaecf0`
+    static let border = Color(red: 234 / 255, green: 236 / 255, blue: 240 / 255)
+    static let addBackground = Color(red: 234 / 255, green: 236 / 255, blue: 240 / 255)
+    /// `#8d939c`
+    static let addForeground = Color(red: 141 / 255, green: 147 / 255, blue: 156 / 255)
+    /// `#1c1c1e`
+    static let removeForeground = Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255)
+    static let removeBackground = Color.white
+    static let glyphStroke = StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+}
+
+/// Outline `xmark` / `plus` matching the `ComposerIcon` stroke style (no fill).
+private struct AttachmentStripGlyph: Shape {
+    enum Kind { case xmark, plus }
+    let kind: Kind
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let inset = rect.insetBy(dx: rect.width * 0.2, dy: rect.height * 0.2)
+        switch kind {
+        case .xmark:
+            p.move(to: CGPoint(x: inset.minX, y: inset.minY))
+            p.addLine(to: CGPoint(x: inset.maxX, y: inset.maxY))
+            p.move(to: CGPoint(x: inset.maxX, y: inset.minY))
+            p.addLine(to: CGPoint(x: inset.minX, y: inset.maxY))
+        case .plus:
+            p.move(to: CGPoint(x: inset.minX, y: rect.midY))
+            p.addLine(to: CGPoint(x: inset.maxX, y: rect.midY))
+            p.move(to: CGPoint(x: rect.midX, y: inset.minY))
+            p.addLine(to: CGPoint(x: rect.midX, y: inset.maxY))
+        }
+        return p
     }
 }
 
