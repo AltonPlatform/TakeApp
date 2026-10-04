@@ -42,6 +42,15 @@ final class MentionOverlayStateTests: XCTestCase {
         XCTAssertNil(candidate.avatarURL)
         XCTAssertFalse(candidate.isFollowing)
     }
+
+    func testOverlayHeightCalculations() {
+        XCTAssertEqual(MentionOverlayView.overlayHeight(candidateCount: 0), 0)
+        XCTAssertEqual(MentionOverlayView.overlayHeight(candidateCount: 1), 44)
+        XCTAssertEqual(MentionOverlayView.overlayHeight(candidateCount: 2), 88)
+        XCTAssertEqual(MentionOverlayView.overlayHeight(candidateCount: 4), 176)
+        XCTAssertEqual(MentionOverlayView.overlayHeight(candidateCount: 5), 176)
+        XCTAssertEqual(MentionOverlayView.overlayHeight(candidateCount: 10), 176)
+    }
 }
 
 extension MentionCandidate {

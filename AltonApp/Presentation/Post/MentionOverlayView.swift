@@ -42,13 +42,21 @@ private extension Color {
 
 /// Floating glass overlay displaying mention suggestions above the bottom chrome.
 struct MentionOverlayView: View {
+    static let rowHeight: CGFloat = 44
+    static let maxVisibleRows: Int = 4
+
+    static func overlayHeight(candidateCount: Int) -> CGFloat {
+        guard candidateCount > 0 else { return 0 }
+        let rows = min(candidateCount, maxVisibleRows)
+        return CGFloat(rows) * rowHeight
+    }
+
     let candidates: [MentionCandidate]
     var query: String = ""
     var onSelect: (MentionCandidate) -> Void
 
     private var contentHeight: CGFloat {
-        let rows = min(candidates.count, 4)
-        return CGFloat(rows) * 44
+        Self.overlayHeight(candidateCount: candidates.count)
     }
 
     var body: some View {
@@ -58,14 +66,7 @@ struct MentionOverlayView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     ForEach(candidates) { candidate in
-                        row(for: candidate)
-
-                        if candidate.id != candidates.last?.id {
-                            Rectangle()
-                                .fill(Color.overlayHairline)
-                                .frame(height: 1)
-                                .padding(.leading, 50)
-                        }
+                        row(for: candidate, isLast: candidate.id == candidates.last?.id)
                     }
                 }
             }
@@ -81,7 +82,7 @@ struct MentionOverlayView: View {
         }
     }
 
-    private func row(for candidate: MentionCandidate) -> some View {
+    private func row(for candidate: MentionCandidate, isLast: Bool) -> some View {
         Button {
             onSelect(candidate)
         } label: {
@@ -103,8 +104,16 @@ struct MentionOverlayView: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 12)
-            .frame(height: 44)
+            .frame(height: Self.rowHeight)
             .contentShape(Rectangle())
+            .overlay(alignment: .bottom) {
+                if !isLast {
+                    Rectangle()
+                        .fill(Color.overlayHairline)
+                        .frame(height: 1)
+                        .padding(.leading, 50)
+                }
+            }
         }
         .buttonStyle(.plain)
     }
@@ -121,6 +130,7 @@ struct MentionOverlayView: View {
                     avatarPlaceholder(for: candidate)
                 }
             }
+            .processors([.resize(width: 28 * UIScreen.main.scale)])
             .frame(width: 28, height: 28)
             .clipShape(Circle())
         } else {
