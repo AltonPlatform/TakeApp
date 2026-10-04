@@ -1,14 +1,33 @@
 import SwiftUI
 
-// MARK: - Color tokens (literal until the shared composer palette lands)
+// MARK: - Color tokens (adaptive; formalized into ComposerPalette later)
 
 private extension Color {
-    /// #1c1c1e
-    static let chromeInk = Color(#colorLiteral(red: 0.1098, green: 0.1098, blue: 0.1176, alpha: 1))
-    /// #eaecf0
-    static let chromeHairline = Color(#colorLiteral(red: 0.9176, green: 0.9255, blue: 0.9412, alpha: 1))
-    /// #a0a3ab
-    static let chromeSecondary = Color(#colorLiteral(red: 0.6275, green: 0.6392, blue: 0.6706, alpha: 1))
+    /// Light `#1c1c1e` / dark `#f5f5f7`.
+    static let chromeInk = Color(uiColor: UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 245 / 255, green: 245 / 255, blue: 247 / 255, alpha: 1)
+            : UIColor(red: 28 / 255, green: 28 / 255, blue: 30 / 255, alpha: 1)
+    })
+    /// Text/spinner drawn on top of `chromeInk` fills — the inverse of ink.
+    /// Light `#ffffff` / dark `#1c1c1e`.
+    static let chromeOnInk = Color(uiColor: UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 28 / 255, green: 28 / 255, blue: 30 / 255, alpha: 1)
+            : UIColor.white
+    })
+    /// Light `#eaecf0` / dark `#2c2c2e`.
+    static let chromeHairline = Color(uiColor: UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 44 / 255, green: 44 / 255, blue: 46 / 255, alpha: 1)
+            : UIColor(red: 234 / 255, green: 236 / 255, blue: 240 / 255, alpha: 1)
+    })
+    /// Light `#a0a3ab` / dark `#8e8e93`.
+    static let chromeSecondary = Color(uiColor: UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 142 / 255, green: 142 / 255, blue: 147 / 255, alpha: 1)
+            : UIColor(red: 160 / 255, green: 163 / 255, blue: 171 / 255, alpha: 1)
+    })
 }
 
 // MARK: - State
@@ -19,6 +38,10 @@ struct ComposerPublishState: Equatable {
     let isSubmitting: Bool
 
     var canPublish: Bool { !isSubmitting && canSubmitContent }
+
+    /// Post pill shows its muted look only when idle and unable to submit
+    /// (while submitting the spinner is shown on the solid pill).
+    var isDimmed: Bool { !canSubmitContent && !isSubmitting }
 }
 
 /// UI state of the bottom chrome that is independent of the draft itself.
@@ -347,6 +370,11 @@ struct ComposerBottomChrome: View {
     /// Format capsule row height including its divider.
     static let formatRowHeight: CGFloat = 47
 
+    /// Fraction of the character limit used, clamped to 0...1 (0 for a non-positive limit).
+    static func meterProgress(used: Int, limit: Int) -> CGFloat {
+        limit <= 0 ? 0 : min(1, max(0, CGFloat(used) / CGFloat(limit)))
+    }
+
     @Binding var chromeState: ComposerChromeState
     let isPreviewMode: Bool
     let formatState: RichTextFormatState
@@ -388,6 +416,15 @@ struct ComposerBottomChrome: View {
             Rectangle()
                 .fill(Color.chromeHairline)
                 .frame(height: 1)
+        }
+        // Inset top highlight: faint glass edge just below the hairline.
+        .overlay(alignment: .top) {
+            Capsule()
+                .fill(Color.white.opacity(0.6))
+                .frame(height: 1)
+                .padding(.horizontal, 8)
+                .padding(.top, 1)
+                .allowsHitTesting(false)
         }
     }
 
@@ -498,8 +535,9 @@ struct ComposerBottomChrome: View {
                 }
             }
         } label: {
-            toolLabel(.more, isActive: false)
+            toolLabel(.more, isActive: false, disabled: isPreviewMode)
         }
+        .disabled(isPreviewMode)
         .accessibilityLabel(ComposerIcon.more.accessibilityLabel)
     }
 
@@ -510,7 +548,7 @@ struct ComposerBottomChrome: View {
     @ViewBuilder
     private var characterMeter: some View {
         if remainingCharacters <= 400 {
-            let progress = min(1, max(0, Double(usedCharacters) / Double(characterLimit)))
+            let progress = Self.meterProgress(used: usedCharacters, limit: characterLimit)
             HStack(spacing: 6) {
                 ZStack {
                     Circle()
@@ -538,17 +576,19 @@ struct ComposerBottomChrome: View {
     // MARK: Post pill
 
     private var postPill: some View {
-        let isDimmed = !publishState.canSubmitContent && !publishState.isSubmitting
+        let isDimmed = publishState.isDimmed
         return Button(action: onPublish) {
             Group {
                 if publishState.isSubmitting {
-                    ProgressView().tint(.white)
+                    ProgressView().tint(Color.chromeOnInk)
                 } else {
                     Text(publishTitle)
                         .font(.system(size: 14, weight: .semibold))
                 }
             }
-            .foregroundStyle(isDimmed ? Color.chromeSecondary : Color.white)
+            // Same minimum width for spinner and title so the pill doesn't jump.
+            .frame(minWidth: 44)
+            .foregroundStyle(isDimmed ? Color.chromeSecondary : Color.chromeOnInk)
             .padding(.horizontal, 18)
             .padding(.vertical, 7)
             .background(isDimmed ? Color.chromeHairline : Color.chromeInk, in: Capsule())
