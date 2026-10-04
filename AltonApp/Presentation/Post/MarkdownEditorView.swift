@@ -214,7 +214,8 @@ private struct PasteCodeHintBanner: View {
     }
 }
 
-private struct RichTextEditorView: UIViewRepresentable {
+// Internal (not private) so @testable tests can reach `Coordinator`.
+struct RichTextEditorView: UIViewRepresentable {
     @Binding var content: NSAttributedString
     var markdownSource: String
     @Binding var pasteCodeHint: RichTextPasteCodeHint?
@@ -299,13 +300,15 @@ private struct RichTextEditorView: UIViewRepresentable {
             }
         }
 
+        // Every pass gets a fresh token; anything staged in an earlier pass is stale.
+        context.coordinator.bumpToken()
         context.coordinator.importExternalMarkdownIfNeeded(markdownSource, into: textView)
-        if let edit = pendingEdit, edit.id != context.coordinator.consumedEditID {
-            context.coordinator.consumedEditID = edit.id
-            context.coordinator.apply(edit, to: textView)
-            DispatchQueue.main.async {
-                pendingEdit = nil
-            }
+        if let edit = pendingEdit {
+            // Consume synchronously: stage, apply, and clear the binding in this same pass
+            // so a re-entrant updateUIView can never re-apply the edit (binding-loop race).
+            context.coordinator.stagePendingEdit(edit)
+            context.coordinator.applyPendingEditIfNeeded(to: textView)
+            pendingEdit = nil
         }
 
         if applyPasteCodeHint {
@@ -316,19 +319,10 @@ private struct RichTextEditorView: UIViewRepresentable {
         }
 
         if let action = pendingFormatAction {
-            if !textView.isFirstResponder {
-                textView.becomeFirstResponder()
-            }
-            context.coordinator.isApplyingFormat = true
-            RichTextFormatter.apply(action, to: textView)
-            context.coordinator.isApplyingFormat = false
-            if textView.pinnedTypingAttributes == nil {
-                context.coordinator.textViewDidChange(textView)
-            }
-            context.coordinator.publishChromeState(from: textView)
-            DispatchQueue.main.async {
-                pendingFormatAction = nil
-            }
+            // Same synchronous stage -> apply -> clear sequence as pendingEdit.
+            context.coordinator.stagePendingFormatAction(action)
+            context.coordinator.applyPendingFormatActionIfNeeded(to: textView)
+            pendingFormatAction = nil
         }
     }
 
@@ -360,6 +354,19 @@ private struct RichTextEditorView: UIViewRepresentable {
         var isApplyingFormat = false
         var isImporting = false
         var isExporting = false
+
+        // Binding-loop race guards (see updateUIView).
+        /// Bumped once per updateUIView pass; anything staged in an older pass is stale.
+        private(set) var currentToken: UInt64 = 0
+        private(set) var pendingEditToken: UInt64 = 0
+        private(set) var pendingFormatToken: UInt64 = 0
+        /// True while local (typed / applied) mutations have not yet been echoed to the binding.
+        /// While true the editor's text is the source of truth and external imports are skipped.
+        private(set) var isAuthoritative = false
+        private(set) var pendingEdit: PendingComposerEdit?
+        private(set) var pendingFormatAction: RichTextFormatAction?
+        private var unconsumedLocalMutations = 0
+
         private var previousSelection = NSRange(location: 0, length: 0)
         private var isRestoringSelection = false
         private var lastEditedRange = NSRange(location: 0, length: 0)
@@ -386,6 +393,55 @@ private struct RichTextEditorView: UIViewRepresentable {
             self.onSelectionLengthChange = onSelectionLengthChange
             self.onPlainCaretChange = onPlainCaretChange
             self.onHeightChange = onHeightChange
+        }
+
+        func bumpToken() {
+            currentToken &+= 1
+        }
+
+        func setAuthoritative(_ value: Bool) {
+            isAuthoritative = value
+        }
+
+        func stagePendingEdit(_ edit: PendingComposerEdit?) {
+            pendingEdit = edit
+            pendingEditToken = currentToken
+        }
+
+        /// Consumes the staged edit synchronously. Always clears it; applies only when it is
+        /// fresh (staged in the current pass) and has not been applied before.
+        @discardableResult
+        func applyPendingEditIfNeeded(to textView: UITextView) -> Bool {
+            guard let edit = pendingEdit else { return false }
+            pendingEdit = nil
+            guard pendingEditToken >= currentToken else { return false }
+            guard edit.id != consumedEditID else { return false }
+            consumedEditID = edit.id
+            apply(edit, to: textView)
+            return true
+        }
+
+        func stagePendingFormatAction(_ action: RichTextFormatAction?) {
+            pendingFormatAction = action
+            pendingFormatToken = currentToken
+        }
+
+        @discardableResult
+        func applyPendingFormatActionIfNeeded(to textView: RichTextTextView) -> Bool {
+            guard let action = pendingFormatAction else { return false }
+            pendingFormatAction = nil
+            guard pendingFormatToken >= currentToken else { return false }
+            if !textView.isFirstResponder {
+                textView.becomeFirstResponder()
+            }
+            isApplyingFormat = true
+            RichTextFormatter.apply(action, to: textView)
+            isApplyingFormat = false
+            if textView.pinnedTypingAttributes == nil {
+                textViewDidChange(textView)
+            }
+            publishChromeState(from: textView)
+            return true
         }
 
         func apply(_ edit: PendingComposerEdit, to textView: UITextView) {
@@ -476,11 +532,21 @@ private struct RichTextEditorView: UIViewRepresentable {
         }
 
         func importExternalMarkdownIfNeeded(_ markdown: String, into textView: RichTextTextView) {
-            if isExporting || isImporting { return }
-
             let live = RichTextMarkdownConverter.markdown(
                 from: textView.attributedText ?? RichTextStyle.emptyDocument()
             )
+            performImport(markdown, live: live, into: textView)
+        }
+
+        /// Testable core: `current` is the editor's live markdown.
+        func importExternalMarkdownIfNeeded(newMarkdown: String, current: String) {
+            guard let textView else { return }
+            performImport(newMarkdown, live: current, into: textView)
+        }
+
+        private func performImport(_ markdown: String, live: String, into textView: RichTextTextView) {
+            if isExporting || isImporting || isAuthoritative { return }
+
             if live == markdown || markdown == lastExportedMarkdown {
                 lastExportedMarkdown = live
                 return
@@ -623,6 +689,10 @@ private struct RichTextEditorView: UIViewRepresentable {
                 ? RichTextFormatter.detectPasteCodeCandidate(in: textView, near: lastEditedRange)
                 : nil
             let publish = onMarkdownChange
+            // Count in-flight exports: with rapid edits an earlier export landing must not
+            // release ownership while later ones are still queued.
+            unconsumedLocalMutations += 1
+            isAuthoritative = true
             isExporting = true
             DispatchQueue.main.async {
                 self.content = attributed
@@ -630,8 +700,20 @@ private struct RichTextEditorView: UIViewRepresentable {
                 if wasPaste {
                     self.pasteCodeHint = hint
                 }
-                self.isExporting = false
+                self.unconsumedLocalMutations = max(self.unconsumedLocalMutations - 1, 0)
+                if self.unconsumedLocalMutations == 0 {
+                    self.isExporting = false
+                    self.isAuthoritative = false
+                }
             }
+        }
+
+        func textViewDidBeginEditing(_ textView: UITextView) {
+            isAuthoritative = unconsumedLocalMutations > 0
+        }
+
+        func textViewDidEndEditing(_ textView: UITextView) {
+            isAuthoritative = unconsumedLocalMutations > 0
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
