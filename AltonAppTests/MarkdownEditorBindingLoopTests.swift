@@ -66,21 +66,6 @@ final class MarkdownEditorBindingLoopTests: XCTestCase {
         XCTAssertEqual(textView.attributedText.string, "hi!", "the same edit must never double-apply")
     }
 
-    @MainActor
-    func testStaleTokenIgnored() {
-        let (coordinator, textView) = makeEditor(markdown: "a")
-        textView.selectedRange = NSRange(location: 1, length: 0)
-
-        coordinator.stagePendingEdit(PendingComposerEdit(id: 1, insert: "stale"))
-        coordinator.bumpToken() // a newer updateUIView pass happened before the edit was applied
-        XCTAssertLessThan(coordinator.pendingEditToken, coordinator.currentToken)
-        let applied = coordinator.applyPendingEditIfNeeded(to: textView)
-
-        XCTAssertFalse(applied)
-        XCTAssertEqual(textView.attributedText.string, "a", "stale pending edit must be ignored")
-        XCTAssertNil(coordinator.pendingEdit, "stale edit must still be discarded")
-    }
-
     // MARK: - pendingFormatAction
 
     @MainActor
@@ -149,20 +134,6 @@ final class MarkdownEditorBindingLoopTests: XCTestCase {
     }
 
     @MainActor
-    func testStaleFormatActionIgnored() {
-        let (coordinator, textView) = makeEditor(markdown: "hello")
-        textView.selectedRange = NSRange(location: 0, length: 5)
-
-        coordinator.stagePendingFormatAction(PendingFormatAction(id: 1, action: .bold))
-        coordinator.bumpToken()
-        let applied = coordinator.applyPendingFormatActionIfNeeded(to: textView)
-
-        XCTAssertFalse(applied)
-        XCTAssertFalse(isBold(textView, at: 0), "stale format action must be ignored")
-        XCTAssertNil(coordinator.pendingFormatAction)
-    }
-
-    @MainActor
     private func isBold(_ textView: UITextView, at index: Int) -> Bool {
         guard let font = textView.attributedText.attribute(.font, at: index, effectiveRange: nil) as? UIFont else {
             return false
@@ -173,22 +144,10 @@ final class MarkdownEditorBindingLoopTests: XCTestCase {
     // MARK: - ownership flag
 
     @MainActor
-    func testAuthoritativeSkipsImport() {
-        let (coordinator, textView) = makeEditor(markdown: "a")
-        coordinator.setAuthoritative(true)
-        XCTAssertTrue(coordinator.isAuthoritative)
-
-        // While authoritative, an external binding change must NOT overwrite the editor's text.
-        coordinator.importExternalMarkdownIfNeeded(newMarkdown: "external", current: "a")
-        XCTAssertEqual(textView.attributedText.string, "a", "import must be skipped while editor is authoritative")
-    }
-
-    @MainActor
-    func testExternalSetReplacesContentWhenNotAuthoritative() {
-        // Regression: draft open / autosave restore (binding changes from outside, editor not
-        // authoritative) must still replace the editor's text.
+    func testExternalSetReplacesContentWhenNotExporting() {
+        // Regression: draft open / autosave restore (binding changes from outside, no export
+        // in flight) must still replace the editor's text.
         let (coordinator, textView) = makeEditor(markdown: "old")
-        coordinator.setAuthoritative(false)
 
         coordinator.importExternalMarkdownIfNeeded(newMarkdown: "restored draft", current: "old")
         XCTAssertEqual(textView.attributedText.string, "restored draft")
@@ -197,7 +156,7 @@ final class MarkdownEditorBindingLoopTests: XCTestCase {
     @MainActor
     func testLocalMutationHoldsOwnershipUntilEveryExportLands() async {
         let (coordinator, textView) = makeEditor(markdown: "a")
-        XCTAssertFalse(coordinator.isAuthoritative)
+        XCTAssertFalse(coordinator.isExporting)
 
         // Two rapid local mutations => two exports in flight.
         textView.selectedRange = NSRange(location: 1, length: 0)
@@ -206,14 +165,12 @@ final class MarkdownEditorBindingLoopTests: XCTestCase {
         coordinator.stagePendingEdit(PendingComposerEdit(id: 2, insert: "c"))
         coordinator.applyPendingEditIfNeeded(to: textView)
 
-        XCTAssertTrue(coordinator.isAuthoritative, "un-exported local mutations make the editor authoritative")
-        XCTAssertTrue(coordinator.isExporting)
+        XCTAssertTrue(coordinator.isExporting, "un-exported local mutations block external imports")
         // Binding still holds the pre-edit value: the stale echo must not wipe the typed text.
         coordinator.importExternalMarkdownIfNeeded(newMarkdown: "a", current: "abc")
         XCTAssertEqual(textView.attributedText.string, "abc")
 
         await drainMainQueue()
-        XCTAssertFalse(coordinator.isAuthoritative, "ownership released once all exports landed")
-        XCTAssertFalse(coordinator.isExporting)
+        XCTAssertFalse(coordinator.isExporting, "released once all exports landed")
     }
 }

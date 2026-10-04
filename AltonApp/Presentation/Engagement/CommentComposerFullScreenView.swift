@@ -106,7 +106,7 @@ struct CommentComposerFullScreenView: View {
             }
             .navigationTitle("Reply")
             .navigationBarTitleDisplayMode(.inline)
-            .liquidGlassKeyboardDismiss(controller: dismissController)
+            .liquidGlassKeyboardDismiss(controller: dismissController, bottomInset: 56)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)

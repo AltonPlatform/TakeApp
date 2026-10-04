@@ -181,7 +181,7 @@ struct CreatePostView: View {
             }
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .liquidGlassKeyboardDismiss(controller: dismissController)
+            .liquidGlassKeyboardDismiss(controller: dismissController, bottomInset: chromeHeight)
             .toolbar {
                 if showsDismissControl {
                     ToolbarItem(placement: .cancellationAction) {

@@ -245,6 +245,7 @@ struct RichTextEditorView: UIViewRepresentable {
         let textView = RichTextTextView()
         textView.delegate = context.coordinator
         applyStyle(to: textView)
+        textView.tintColor = UIColor(ComposerPalette.monochrome.primary)
         textView.expandsToFitContent = expandsToFitContent
         textView.autocorrectionType = .yes
         textView.autocapitalizationType = .sentences
@@ -308,8 +309,6 @@ struct RichTextEditorView: UIViewRepresentable {
             }
         }
 
-        // Every pass gets a fresh token; anything staged in an earlier pass is stale.
-        context.coordinator.bumpToken()
         context.coordinator.importExternalMarkdownIfNeeded(markdownSource, into: textView)
         if let edit = pendingEdit {
             // Stage + apply in this pass. Re-application in a re-entrant pass (binding not yet
@@ -378,19 +377,7 @@ struct RichTextEditorView: UIViewRepresentable {
         var isImporting = false
         var isExporting = false
 
-        // Binding-loop race guards (see updateUIView).
-        /// Bumped once per updateUIView pass; anything staged in an older pass is stale.
-        private(set) var currentToken: UInt64 = 0
-        private(set) var pendingEditToken: UInt64 = 0
-        private(set) var pendingFormatToken: UInt64 = 0
-        /// True while local (typed / applied) mutations have not yet been echoed to the binding.
-        /// While true the editor's text is the source of truth and external imports are skipped.
-        ///
-        /// NOTE: currently this duplicates `isExporting` exactly (set together, cleared together,
-        /// zero behavioral difference). The spec intended it to detect *external* `string`
-        /// changes via the token gate; that is deferred to the final whole-branch review, which
-        /// decides whether to make it meaningful or collapse it into `isExporting`.
-        private(set) var isAuthoritative = false
+        // Binding-loop race guards (see updateUIView): `consumedEditID` / `consumedFormatActionID`.
         private(set) var pendingEdit: PendingComposerEdit?
         private(set) var pendingFormatAction: PendingFormatAction?
         /// Number of exports queued to the binding that have not landed yet.
@@ -424,31 +411,18 @@ struct RichTextEditorView: UIViewRepresentable {
             self.onHeightChange = onHeightChange
         }
 
-        func bumpToken() {
-            currentToken &+= 1
-        }
-
-        /// Test-only hook: forces the ownership flag. Not called from production code; prod sets
-        /// it in `textViewDidChange` / the begin/end editing delegate callbacks.
-        func setAuthoritative(_ value: Bool) {
-            isAuthoritative = value
-        }
-
         func stagePendingEdit(_ edit: PendingComposerEdit?) {
             pendingEdit = edit
-            pendingEditToken = currentToken
         }
 
         /// Consumes the staged edit. The local mirror is always cleared (benign: a Coordinator
-        /// property, not SwiftUI state). Applies only when it is fresh and its id has not been
-        /// applied before. The id guard (`consumedEditID`) is the real defense against
-        /// re-application when the `@Binding` clear is deferred; the token gate is a second
-        /// layer that discards an edit staged in an earlier `updateUIView` pass.
+        /// property, not SwiftUI state). Applies only when its id has not been applied before:
+        /// the id guard (`consumedEditID`) is the defense against re-application when the
+        /// `@Binding` clear is deferred.
         @discardableResult
         func applyPendingEditIfNeeded(to textView: UITextView) -> Bool {
             guard let edit = pendingEdit else { return false }
             pendingEdit = nil
-            guard pendingEditToken >= currentToken else { return false }
             guard edit.id != consumedEditID else { return false }
             consumedEditID = edit.id
             apply(edit, to: textView)
@@ -457,7 +431,6 @@ struct RichTextEditorView: UIViewRepresentable {
 
         func stagePendingFormatAction(_ action: PendingFormatAction?) {
             pendingFormatAction = action
-            pendingFormatToken = currentToken
         }
 
         /// Consumes the staged format action. Same contract as `applyPendingEditIfNeeded`:
@@ -466,7 +439,6 @@ struct RichTextEditorView: UIViewRepresentable {
         func applyPendingFormatActionIfNeeded(to textView: RichTextTextView) -> Bool {
             guard let pending = pendingFormatAction else { return false }
             pendingFormatAction = nil
-            guard pendingFormatToken >= currentToken else { return false }
             guard pending.id > consumedFormatActionID else { return false }
             consumedFormatActionID = pending.id
             let action = pending.action
@@ -595,7 +567,7 @@ struct RichTextEditorView: UIViewRepresentable {
             live liveProvider: @autoclosure () -> String,
             into textView: RichTextTextView
         ) {
-            if isExporting || isImporting || isAuthoritative { return }
+            if isExporting || isImporting { return }
             let live = liveProvider()
 
             if live == markdown || markdown == lastExportedMarkdown {
@@ -743,7 +715,6 @@ struct RichTextEditorView: UIViewRepresentable {
             // Count in-flight exports: with rapid edits an earlier export landing must not
             // release ownership while later ones are still queued.
             inFlightExports += 1
-            isAuthoritative = true
             isExporting = true
             DispatchQueue.main.async {
                 self.content = attributed
@@ -754,17 +725,8 @@ struct RichTextEditorView: UIViewRepresentable {
                 self.inFlightExports = max(self.inFlightExports - 1, 0)
                 if self.inFlightExports == 0 {
                     self.isExporting = false
-                    self.isAuthoritative = false
                 }
             }
-        }
-
-        func textViewDidBeginEditing(_ textView: UITextView) {
-            isAuthoritative = inFlightExports > 0
-        }
-
-        func textViewDidEndEditing(_ textView: UITextView) {
-            isAuthoritative = inFlightExports > 0
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {

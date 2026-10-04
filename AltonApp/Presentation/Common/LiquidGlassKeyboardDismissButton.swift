@@ -39,9 +39,9 @@ struct LiquidGlassKeyboardDismissButton: View {
                     Text("Done").font(.system(size: 14, weight: .semibold))
                 }
                 .padding(.horizontal, 14).padding(.vertical, 7)
-                .foregroundStyle(Color(#colorLiteral(red: 0.11, green: 0.11, blue: 0.12, alpha: 1)))
+                .foregroundStyle(ComposerPalette.monochrome.primary)
                 .background(.ultraThinMaterial, in: Capsule().inset(by: 0.5))
-                .overlay(Capsule().inset(by: 0.5).strokeBorder(Color(#colorLiteral(red: 0.92, green: 0.93, blue: 0.94, alpha: 1)), lineWidth: 1))
+                .overlay(Capsule().inset(by: 0.5).strokeBorder(ComposerPalette.monochrome.divider, lineWidth: 1))
                 .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
             }
             .buttonStyle(.plain)
