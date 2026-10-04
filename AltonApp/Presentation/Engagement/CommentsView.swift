@@ -2,6 +2,7 @@ import SwiftUI
 import PhotosUI
 
 struct CommentsView: View {
+    private static let composerBarHeight: CGFloat = 68
     @Bindable var viewModel: CommentsViewModel
     var session: AuthSession?
     var container: DependencyContainer?
@@ -117,7 +118,7 @@ struct CommentsView: View {
                     Button("Close") { dismiss() }
                 }
             }
-            .liquidGlassKeyboardDismiss(controller: dismissController)
+            .liquidGlassKeyboardDismiss(controller: dismissController, bottomInset: Self.composerBarHeight)
             .task {
                 viewModel.currentUserAvatarURL = session?.user.avatarURL
                 await viewModel.loadInitial()

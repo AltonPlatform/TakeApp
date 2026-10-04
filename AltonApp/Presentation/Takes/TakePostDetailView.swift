@@ -44,6 +44,7 @@ struct TakePostDetailView: View {
     @State private var mentionPicker: MentionPickerModel
     @State private var didApplyComposerFocus = false
     @FocusState private var isComposerFocused: Bool
+    private static let composerBarHeight: CGFloat = 76
     @State private var dismissController = KeyboardDismissController()
     @Environment(\.dismiss) private var dismiss
 
@@ -143,7 +144,7 @@ struct TakePostDetailView: View {
         }
         .background(Color(.systemBackground))
         .navigationBarTitleDisplayMode(.inline)
-        .liquidGlassKeyboardDismiss(controller: dismissController)
+        .liquidGlassKeyboardDismiss(controller: dismissController, bottomInset: Self.composerBarHeight)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Image("nav.take")

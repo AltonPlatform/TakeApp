@@ -51,17 +51,20 @@ struct LiquidGlassKeyboardDismissButton: View {
 }
 
 extension View {
-    /// Overlays the glass Done button at bottom-trailing, lifted by `keyboardHeight`
-    /// so it floats just above the keyboard's top edge. Hidden when keyboard is down.
+    /// Overlays the glass Done button at bottom-trailing, lifted by `keyboardHeight + bottomInset`
+    /// so it floats just above the keyboard's top edge (and above any bottom composer bar). Hidden when keyboard is down.
     ///
     /// The overlay content ignores the keyboard safe area (`.ignoresSafeArea(.keyboard)`) so that
-    /// the explicit `-(controller.keyboardHeight) - 8` offset correctly positions the button just above
-    /// the keyboard top edge regardless of whether the host view handles or ignores keyboard safe area.
-    func liquidGlassKeyboardDismiss(controller: KeyboardDismissController) -> some View {
+    /// the explicit `-(controller.keyboardHeight + bottomInset) - 8` offset correctly positions the button just above
+    /// the keyboard top edge (or bottom composer bar) regardless of whether the host view handles or ignores keyboard safe area.
+    func liquidGlassKeyboardDismiss(
+        controller: KeyboardDismissController,
+        bottomInset: CGFloat = 0
+    ) -> some View {
         overlay(alignment: .bottomTrailing) {
             LiquidGlassKeyboardDismissButton(controller: controller)
                 .padding(.trailing, 12)
-                .offset(y: -(controller.keyboardHeight) - 8)
+                .offset(y: -(controller.keyboardHeight + bottomInset) - 8)
                 .allowsHitTesting(controller.isKeyboardVisible)
                 .animation(.easeInOut(duration: 0.25), value: controller.keyboardHeight)
                 .ignoresSafeArea(.keyboard)

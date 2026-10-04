@@ -77,6 +77,7 @@ struct ReplyTakeView: View {
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var showGIFPicker = false
     @FocusState private var isComposerFocused: Bool
+    private static let composerBarHeight: CGFloat = 64
     @State private var dismissController = KeyboardDismissController()
 
     init(
@@ -212,7 +213,7 @@ struct ReplyTakeView: View {
         }
         .navigationTitle("Reply")
         .navigationBarTitleDisplayMode(.inline)
-        .liquidGlassKeyboardDismiss(controller: dismissController)
+        .liquidGlassKeyboardDismiss(controller: dismissController, bottomInset: Self.composerBarHeight)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {

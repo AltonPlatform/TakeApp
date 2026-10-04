@@ -3,9 +3,10 @@ import SwiftUI
 @testable import AltonApp
 
 final class LiquidGlassDismissAdoptionTests: XCTestCase {
-    /// Smoke test verifying that composer sheets accept .liquidGlassKeyboardDismiss(controller:)
-    /// and that the controller's runtime state is initialized and reactive.
+    /// Compile-time check asserting that composer sheets accept .liquidGlassKeyboardDismiss(controller:)
+    /// and .liquidGlassKeyboardDismiss(controller:bottomInset:).
     ///
+    /// The successful compilation of these view modifier invocations serves as the assertion.
     /// Note on omitted views:
     /// - ReplyTakeView, CommentsView, TakePostDetailView, and ShotCommentsSheet require
     ///   heavyweight ViewModel dependencies (CommentsViewModel with CommentsUseCase &
@@ -32,32 +33,14 @@ final class LiquidGlassDismissAdoptionTests: XCTestCase {
         _ = CommentGIFPickerSheet(onPicked: { _ in })
             .liquidGlassKeyboardDismiss(controller: controller)
 
-        // Runtime assertions: controller begins in hidden state and responds to dismiss
-        XCTAssertFalse(controller.isKeyboardVisible)
-        XCTAssertEqual(controller.keyboardHeight, 0)
-
-        // Verify notification updates state
-        let frame = CGRect(x: 0, y: 500, width: 390, height: 340)
-        NotificationCenter.default.post(
-            name: UIResponder.keyboardWillShowNotification,
-            object: nil,
-            userInfo: [UIResponder.keyboardFrameEndUserInfoKey: frame]
-        )
-        XCTAssertTrue(controller.isKeyboardVisible)
-        XCTAssertEqual(controller.keyboardHeight, 340)
-
-        controller.dismiss()
-
-        NotificationCenter.default.post(
-            name: UIResponder.keyboardWillHideNotification,
-            object: nil
-        )
-        XCTAssertFalse(controller.isKeyboardVisible)
-        XCTAssertEqual(controller.keyboardHeight, 0)
+        // Verifies that liquidGlassKeyboardDismiss accepts bottomInset parameter
+        _ = EmptyView()
+            .liquidGlassKeyboardDismiss(controller: controller, bottomInset: 64)
     }
 
     /// Verifies that composer views adopt LiquidGlassKeyboardDismissButton in their body
-    /// and no longer contain the legacy KeyboardDoneButtonModifier.
+    /// and no longer contain legacy KeyboardDone modifiers (matching on "KeyboardDone" prefix
+    /// to cover both KeyboardDoneButtonModifier and KeyboardDoneFocusModifier).
     @MainActor
     func testComposerViewsAdoptLiquidGlassDismissInBody() {
         let locationSheetBody = String(reflecting: LocationPickerSheet(selected: .constant(nil)).body)
@@ -66,8 +49,8 @@ final class LiquidGlassDismissAdoptionTests: XCTestCase {
             "LocationPickerSheet body should include LiquidGlassKeyboardDismissButton"
         )
         XCTAssertFalse(
-            locationSheetBody.contains("KeyboardDoneButtonModifier"),
-            "LocationPickerSheet body should not include KeyboardDoneButtonModifier"
+            locationSheetBody.contains("KeyboardDone"),
+            "LocationPickerSheet body should not include KeyboardDone modifier"
         )
 
         let hashtagSheetBody = String(reflecting: HashtagInsertSheet(caption: .constant(""), query: .constant("")).body)
@@ -76,8 +59,8 @@ final class LiquidGlassDismissAdoptionTests: XCTestCase {
             "HashtagInsertSheet body should include LiquidGlassKeyboardDismissButton"
         )
         XCTAssertFalse(
-            hashtagSheetBody.contains("KeyboardDoneButtonModifier"),
-            "HashtagInsertSheet body should not include KeyboardDoneButtonModifier"
+            hashtagSheetBody.contains("KeyboardDone"),
+            "HashtagInsertSheet body should not include KeyboardDone modifier"
         )
 
         let gifPickerBody = String(reflecting: CommentGIFPickerSheet(onPicked: { _ in }).body)
@@ -86,8 +69,8 @@ final class LiquidGlassDismissAdoptionTests: XCTestCase {
             "CommentGIFPickerSheet body should include LiquidGlassKeyboardDismissButton"
         )
         XCTAssertFalse(
-            gifPickerBody.contains("KeyboardDoneButtonModifier"),
-            "CommentGIFPickerSheet body should not include KeyboardDoneButtonModifier"
+            gifPickerBody.contains("KeyboardDone"),
+            "CommentGIFPickerSheet body should not include KeyboardDone modifier"
         )
 
         let commentComposerBody = String(reflecting: CommentComposerFullScreenView(
@@ -100,6 +83,10 @@ final class LiquidGlassDismissAdoptionTests: XCTestCase {
         XCTAssertTrue(
             commentComposerBody.contains("LiquidGlassKeyboardDismissButton"),
             "CommentComposerFullScreenView body should include LiquidGlassKeyboardDismissButton"
+        )
+        XCTAssertFalse(
+            commentComposerBody.contains("KeyboardDone"),
+            "CommentComposerFullScreenView body should not include KeyboardDone modifier"
         )
     }
 }

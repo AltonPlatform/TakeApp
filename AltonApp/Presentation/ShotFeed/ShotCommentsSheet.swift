@@ -427,6 +427,7 @@ private struct ShotCommentsSheetContent: View {
     @State private var showStickerPicker = false
     @State private var showGIFPicker = false
     @State private var reportCommentID: String?
+    private static let composerBarHeight: CGFloat = 64
     @State private var dismissController = KeyboardDismissController()
 
     init(
@@ -564,7 +565,7 @@ private struct ShotCommentsSheetContent: View {
                 composer
             }
             .navigationBarHidden(true)
-            .liquidGlassKeyboardDismiss(controller: dismissController)
+            .liquidGlassKeyboardDismiss(controller: dismissController, bottomInset: Self.composerBarHeight)
             .onChange(of: viewModel.draft) { _, newValue in
                 mentionPicker.update(from: newValue)
             }
