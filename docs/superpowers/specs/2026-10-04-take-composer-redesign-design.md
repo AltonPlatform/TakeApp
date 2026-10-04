@@ -53,7 +53,7 @@ Model: X / Twitter / Threads compose. Publish in the bottom chrome, right side. 
 - Keeps `ComposerAttachmentStrip` / `ComposerAttachmentThumb` visual: 88px thumbs, `cornerRadius 8` (aligned to Figma media boxes), `0.5px #eaecf0` border.
 - Remove control: `xmark` in a white circle, top-right (outline SVG style, not the current `xmark.circle.fill` palette emoji).
 - "Add" tile: `#eaecf0` background, `cornerRadius 8`, thin `plus` outline SVG + "Add" `#8d939c` label.
-- **DnD reorder (new):** long-press a thumb lifts it (haptic), drag to reorder within the strip; drop snaps with animation. Only reorder within the strip (no cross-app drag in/out). A subtle grip hint appears on long-press. Reorder reorders `viewModel.attachments` and updates `loadedPickerItemIDs`.
+- **DnD reorder (new):** SwiftUI `.draggable` + `.dropDestination` (iOS 16+). Long-press lifts a thumb (haptic), drag to reorder within the strip; drop snaps with animation. Only reorder within the strip (no cross-app drag in/out). A subtle grip hint appears on long-press. Reorder reorders `viewModel.attachments` and updates `loadedPickerItemIDs`.
 
 ### 5.4 Mention overlay (floating, not inset)
 - `MentionAutocompleteView` rendered as a **floating glass capsule** that sits **above** the bottom chrome, anchored near the caret — not inside `safeAreaInset(.bottom)`.
@@ -73,7 +73,7 @@ Model: X / Twitter / Threads compose. Publish in the bottom chrome, right side. 
 - Floats **over** the keyboard's top edge, right side, always visible while the keyboard is up; appears/disappears with the keyboard (driven by keyboard visibility, not a static toolbar item).
 - Glass: white-translucent liquid glass (blur + saturate + inset highlight + `#eaecf0`-ish hairline), `cornerRadius 100` (pill), `#1c1c1e` chevron-down + "Done" label, 13–14px semibold.
 - Action: resign first responder (same as `KeyboardDismiss.dismiss()`).
-- Reusable across all composer screens (Take composer, Reply, Comment composer, location picker, hashtag sheet — any screen using `keyboardDoneButton()`).
+- Reusable across all composer screens. **This change replaces `keyboardDoneButton()` everywhere it is used** — Take composer, Reply (`ReplyTakeView`), Comment composer (`CommentComposerFullScreenView`), Location picker (`LocationPickerSheet`), Hashtag sheet (`HashtagInsertSheet`) — so every composer screen gets the same liquid-glass dismiss button, always paired with the keyboard.
 
 ## 6. Text Duplication / Writing-Error Fix
 
@@ -106,9 +106,9 @@ Model: X / Twitter / Threads compose. Publish in the bottom chrome, right side. 
 
 This is a client-only UI change; no backend, sharding, or Kafka impact. The growth story for composer drafts is unchanged (existing `DraftStore` TTL/prune). No new data.
 
-## 10. Open Questions
+## 10. Decisions (resolved)
 
-1. **Cancel color:** drop system blue for `#1c1c1e` (monochrome, matches Figma) or keep the current blue? Mockup v6 uses `#1c1c1e`. → *decision needed*.
-2. **Mention color:** `#1c1c1e` bold (monochrome) vs keep `UIColor.link` (blue) for the `@al` token. Mockup v6 uses `#1c1c1e` bold. → *decision needed*.
-3. **Dismiss button scope:** replace `keyboardDoneButton()` everywhere (Take, Reply, Comment, Location, Hashtag) in this change, or just the Take composer and roll out incrementally? → *decision needed*.
-4. **DnD gesture:** SwiftUI `.draggable`/`.dropDestination` (iOS 16+) vs a custom long-press lift gesture. `.draggable` is lighter; custom gives more control over the lift animation. → *recommend `.draggable`/`.dropDestination` first; custom only if it feels wrong*.
+1. **Cancel color:** `#1c1c1e` monochrome (drops the current system blue). Matches the Figma design language.
+2. **Mention `@al` color:** `#1c1c1e` **bold** (monochrome). Affordance via weight, not color. Drops `UIColor.link` blue in the composer editor.
+3. **Liquid-glass Done scope:** replace `keyboardDoneButton()` everywhere (Take, Reply, Comment, Location, Hashtag) in this change — one shared `LiquidGlassKeyboardDismissButton` component for all composer screens.
+4. **DnD gesture:** SwiftUI `.draggable` + `.dropDestination` (iOS 16+). Custom long-press lift only if it feels wrong in QA.
