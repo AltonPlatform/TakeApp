@@ -930,10 +930,13 @@ struct TakeDetailCommentRow: View {
         }
         .padding(12)
         .sheet(isPresented: $showShareSheet) {
-            ActivityShareSheet(items: [comment.content]) { _ in
-                showShareSheet = false
+            if let url = PostShareURL.make(postID: comment.postID, commentID: comment.id) {
+                let items: [Any] = comment.content.isEmpty ? [url] : [url, comment.content]
+                ActivityShareSheet(items: items) { _ in
+                    showShareSheet = false
+                }
+                .presentationDetents([.medium, .large])
             }
-            .presentationDetents([.medium, .large])
         }
     }
 
