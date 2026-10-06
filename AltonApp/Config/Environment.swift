@@ -66,6 +66,31 @@ enum AppEnvironment {
         }
     }
 
+    var shareDomain: String {
+        if let value = Bundle.main.object(forInfoDictionaryKey: "AltonShareDomain") as? String {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty, !trimmed.hasPrefix("$(") {
+                return trimmed
+            }
+        }
+        return "alton.social"
+    }
+
+    var shareUniversalHosts: Set<String> {
+        var hosts = Set<String>()
+        hosts.insert(shareDomain.lowercased())
+        if let raw = Bundle.main.object(forInfoDictionaryKey: "AltonShareDomains") as? String {
+            for part in raw.split(separator: ",") {
+                let host = part.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if !host.isEmpty, !host.hasPrefix("$(") {
+                    hosts.insert(host)
+                }
+            }
+        }
+        hosts.insert("alton.social")
+        return hosts
+    }
+
     var trustedUploadHosts: Set<String> {
         switch self {
         case .development:
