@@ -268,12 +268,15 @@ struct TakePostDetailView: View {
             Text("This can’t be undone.")
         }
         .sheet(isPresented: $showShareSheet) {
-            if let url = engagementController.shareURL {
-                ActivityShareSheet(items: [url]) { completed in
+            if let payload = engagementController.makeSharePayload(for: post) {
+                ActivityShareSheet(payload: payload) { completed, channel in
                     showShareSheet = false
-                    if completed {
+                    if completed, let channel {
                         Task {
-                            post = await engagementController.completeShare(post: post)
+                            post = await engagementController.completeShare(
+                                post: post,
+                                channel: channel
+                            )
                         }
                     }
                 }

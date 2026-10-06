@@ -281,12 +281,15 @@ struct ReplyTakeView: View {
             }
         }
         .sheet(isPresented: $showShareSheet) {
-            if let url = engagementController.shareURL {
-                ActivityShareSheet(items: [url]) { completed in
+            if let payload = engagementController.makeSharePayload(for: localPost) {
+                ActivityShareSheet(payload: payload) { completed, channel in
                     showShareSheet = false
-                    if completed {
+                    if completed, let channel {
                         Task {
-                            localPost = await engagementController.completeShare(post: localPost)
+                            localPost = await engagementController.completeShare(
+                                post: localPost,
+                                channel: channel
+                            )
                         }
                     }
                 }
