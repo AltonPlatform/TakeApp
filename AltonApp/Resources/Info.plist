@@ -4,6 +4,10 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>AltonShareDomain</key>
+	<string>$(SHARE_DOMAIN)</string>
+	<key>AltonShareDomains</key>
+	<string>$(SHARE_DOMAINS)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Take</string>
 	<key>CFBundleExecutable</key>
