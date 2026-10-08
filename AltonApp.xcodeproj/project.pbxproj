@@ -212,6 +212,8 @@
 		BFDA1EE64A5935C67C0800C6 /* ReportPostSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38B0F8EA7B062CA281006DB /* ReportPostSheet.swift */; };
 		C05D3552532133CACD2CA86F /* ShotFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E0E33DBDDF23725E3D585F /* ShotFeedView.swift */; };
 		C1C892B4889203952F1A1E8E /* Environment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18AEC7A9A4EFAD7657DDB038 /* Environment.swift */; };
+		KAN46PSU01POSTSHARE0000001 /* PostShareURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = KAN46PSU02POSTSHARE0000002 /* PostShareURL.swift */; };
+		KAN46PSU03DEEPLINKTEST00001 /* ShareDeepLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = KAN46PSU04DEEPLINKTEST00002 /* ShareDeepLinkTests.swift */; };
 		C27C3C5802D5854246E3E7BF /* RichTextMarkdownConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6116E5F7A297D9BB7247DC45 /* RichTextMarkdownConverterTests.swift */; };
 		C2C4BC4205C150C38E913CF0 /* LockOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 866318346CEF868BCD2A2E1D /* LockOverlay.swift */; };
 		C2E329825E7917022C6D1D97 /* ActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 045BCBA6363E2249284748CF /* ActivityView.swift */; };
@@ -346,6 +348,8 @@
 		159157155F759FABA2C9160D /* EngagementRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementRepository.swift; sourceTree = "<group>"; };
 		170D871AAEC05E4AA1E8CC1C /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
 		18AEC7A9A4EFAD7657DDB038 /* Environment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Environment.swift; sourceTree = "<group>"; };
+		KAN46PSU02POSTSHARE0000002 /* PostShareURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostShareURL.swift; sourceTree = "<group>"; };
+		KAN46PSU04DEEPLINKTEST00002 /* ShareDeepLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareDeepLinkTests.swift; sourceTree = "<group>"; };
 		1A0E7713A0273290AEC0A8CB /* FrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameProcessor.swift; sourceTree = "<group>"; };
 		1B14B087380566A1C019DF95 /* CameraFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraFilter.swift; sourceTree = "<group>"; };
 		1D07823A0E2DD5D8E5DDC93D /* EditorCompositionInstruction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCompositionInstruction.swift; sourceTree = "<group>"; };
@@ -702,6 +706,7 @@
 				416E84B48554CDB2E8D90585 /* PostUseCaseShotPublishTests.swift */,
 				6116E5F7A297D9BB7247DC45 /* RichTextMarkdownConverterTests.swift */,
 				A1B2C3D4E5F6000900000001 /* MarkdownEditorBindingLoopTests.swift */,
+				KAN46PSU04DEEPLINKTEST00002 /* ShareDeepLinkTests.swift */,
 			);
 			path = AltonAppTests;
 			sourceTree = "<group>";
@@ -1003,6 +1008,7 @@
 				EFCBF916D2027AADED8C66BE /* CameraKitSecrets.Release.xcconfig */,
 				3255645CC29487E4102B395E /* CrashReporting.swift */,
 				18AEC7A9A4EFAD7657DDB038 /* Environment.swift */,
+				KAN46PSU02POSTSHARE0000002 /* PostShareURL.swift */,
 				8165E8AA87F751D4DCFA01E7 /* GoogleAuthConfig.swift */,
 			);
 			path = Config;
@@ -1633,6 +1639,7 @@
 				12F8011C0BFE6ECFFB85869A /* EngagementRepositoryProtocol.swift in Sources */,
 				D450056E4A3A7067A5EF6D81 /* EngagementUseCase.swift in Sources */,
 				C1C892B4889203952F1A1E8E /* Environment.swift in Sources */,
+				KAN46PSU01POSTSHARE0000001 /* PostShareURL.swift in Sources */,
 				786143EB243EB96C11074B21 /* ErrorView.swift in Sources */,
 				A330CE238C95FFC172738094 /* ExportEngine.swift in Sources */,
 				035574317DE5FD459AA23BD4 /* ExposureController.swift in Sources */,
@@ -1815,6 +1822,7 @@
 				C6CF1C86E64E8ECF2F23CB22 /* PostUseCaseShotPublishTests.swift in Sources */,
 				C27C3C5802D5854246E3E7BF /* RichTextMarkdownConverterTests.swift in Sources */,
 				A1B2C3D4E5F6000900000002 /* MarkdownEditorBindingLoopTests.swift in Sources */,
+				KAN46PSU03DEEPLINKTEST00001 /* ShareDeepLinkTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

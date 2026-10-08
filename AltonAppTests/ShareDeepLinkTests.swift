@@ -16,6 +16,19 @@ final class ShareDeepLinkTests: XCTestCase {
         XCTAssertNil(ShareDeepLinkParser.postID(fromPath: "/p/not valid"))
     }
 
+    func testCommentShareURLIncludesQueryParameter() {
+        let postID = "01HABCDEFGHJKMNPQRSTVWXYZ0"
+        let commentID = "01HBBBBBBBBBBBBBBBBBBBBBBB0"
+        let url = PostShareURL.make(postID: postID, commentID: commentID, domain: "share.example")
+        XCTAssertEqual(url?.absoluteString, "https://share.example/p/\(postID)?c=\(commentID)")
+    }
+
+    func testPostShareURLUsesConfiguredDomain() {
+        let postID = "01HABCDEFGHJKMNPQRSTVWXYZ0"
+        let url = PostShareURL.make(postID: postID, domain: "alton.social")
+        XCTAssertEqual(url?.absoluteString, "https://alton.social/p/\(postID)")
+    }
+
     func testProfileUsernameFromSharePath() {
         XCTAssertEqual(ShareDeepLinkParser.profileUsername(fromPath: "/u/alice"), "alice")
         XCTAssertEqual(ShareDeepLinkParser.profileUsername(fromPath: "/u/Alice/"), "alice")
