@@ -29,6 +29,7 @@ settings:
     # Defaults if an xcconfig is missing; overridden by ShareDomain.*.xcconfig.
     SHARE_DOMAIN: alton.social
     SHARE_DOMAINS: alton.social
+    META_APP_ID: "1993576677971360"
 packages:
   Firebase:
     url: https://github.com/firebase/firebase-ios-sdk

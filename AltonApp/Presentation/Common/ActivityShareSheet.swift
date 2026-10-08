@@ -7,6 +7,24 @@ struct PostSharePayload: Equatable, Sendable {
     let url: URL
     let textExcerpt: String?
     let username: String?
+    /// Optional poster / thumbnail used when rendering the ImageRenderer share card.
+    let posterURL: URL?
+    /// Optional local H.264 file for Instagram Stories background video.
+    let localVideoURL: URL?
+
+    init(
+        url: URL,
+        textExcerpt: String? = nil,
+        username: String? = nil,
+        posterURL: URL? = nil,
+        localVideoURL: URL? = nil
+    ) {
+        self.url = url
+        self.textExcerpt = textExcerpt
+        self.username = username
+        self.posterURL = posterURL
+        self.localVideoURL = localVideoURL
+    }
 
     /// Share sheet message, e.g. `"Hello — @alice in Take"`.
     var shareMessage: String {
@@ -78,14 +96,35 @@ struct ActivityShareSheet: UIViewControllerRepresentable {
         self.onComplete = onComplete
     }
 
+    @MainActor
     func makeCoordinator() -> Coordinator {
         Coordinator(payload: payload)
     }
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
         let source = context.coordinator.itemSource
-        let controller = UIActivityViewController(activityItems: [source], applicationActivities: nil)
+        var items: [Any] = [source]
+        if let card = context.coordinator.cardImage {
+            items.append(card)
+        }
+
+        let stories = InstagramStoriesActivity(
+            backgroundImage: context.coordinator.cardImage ?? context.coordinator.posterImage,
+            stickerImage: context.coordinator.cardImage,
+            backgroundVideoURL: payload.localVideoURL
+        ) { [onComplete] in
+            onComplete(true, "instagram")
+        }
+
+        let controller = UIActivityViewController(
+            activityItems: items,
+            applicationActivities: [stories]
+        )
         controller.completionWithItemsHandler = { activityType, completed, _, _ in
+            // Custom Stories activity already reports completion via `onShared`.
+            if activityType == stories.activityType {
+                return
+            }
             if completed {
                 onComplete(true, ShareChannelMapper.channel(for: activityType))
             } else {
@@ -97,11 +136,23 @@ struct ActivityShareSheet: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 
+    @MainActor
     final class Coordinator {
         let itemSource: PostShareItemSource
+        let cardImage: UIImage?
+        let posterImage: UIImage?
 
         init(payload: PostSharePayload) {
             self.itemSource = PostShareItemSource(payload: payload)
+            // Only load local file posters synchronously; remote thumbs use gradient card.
+            var poster: UIImage?
+            if let posterURL = payload.posterURL, posterURL.isFileURL,
+               let data = try? Data(contentsOf: posterURL),
+               let image = UIImage(data: data) {
+                poster = image
+            }
+            self.posterImage = poster
+            self.cardImage = PostShareCardRenderer.render(payload: payload, posterImage: poster)
         }
     }
 }
