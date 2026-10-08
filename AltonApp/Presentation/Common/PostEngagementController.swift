@@ -118,7 +118,9 @@ final class PostEngagementController {
         return PostSharePayload(
             url: url,
             textExcerpt: post.content,
-            username: post.creatorUsername
+            username: post.creatorUsername,
+            posterURL: post.thumbnailURL ?? post.playbackURL,
+            localVideoURL: nil
         )
     }
 

@@ -1,3 +1,4 @@
 // Share / universal-link domains for Release + AppStore.
 SHARE_DOMAIN = alton.social
 SHARE_DOMAINS = alton.social
+META_APP_ID = 1993576677971360
