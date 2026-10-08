@@ -15,4 +15,12 @@ final class ShareDeepLinkTests: XCTestCase {
         XCTAssertNil(ShareDeepLinkParser.postID(fromPath: "/p/"))
         XCTAssertNil(ShareDeepLinkParser.postID(fromPath: "/p/not valid"))
     }
+
+    func testProfileUsernameFromSharePath() {
+        XCTAssertEqual(ShareDeepLinkParser.profileUsername(fromPath: "/u/alice"), "alice")
+        XCTAssertEqual(ShareDeepLinkParser.profileUsername(fromPath: "/u/Alice/"), "alice")
+        XCTAssertNil(ShareDeepLinkParser.profileUsername(fromPath: "/p/alice"))
+        XCTAssertNil(ShareDeepLinkParser.profileUsername(fromPath: "/u/ab"))
+        XCTAssertNil(ShareDeepLinkParser.profileUsername(fromPath: "/u/bad-name"))
+    }
 }

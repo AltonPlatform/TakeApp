@@ -89,6 +89,7 @@ final class DependencyContainer {
         let hasStoredCredentials = (try? tokenStore.load()) != nil
         self.sessionStore = AppSessionStore(
             authUseCase: authUseCase,
+            userUseCase: userUseCase,
             tokenStore: tokenStore,
             hasStoredCredentials: hasStoredCredentials
         )
