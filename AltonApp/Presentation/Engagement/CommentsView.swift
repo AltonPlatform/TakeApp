@@ -2,6 +2,7 @@ import SwiftUI
 import PhotosUI
 
 struct CommentsView: View {
+    private static let composerBarHeight: CGFloat = 68
     @Bindable var viewModel: CommentsViewModel
     var session: AuthSession?
     var container: DependencyContainer?
@@ -12,6 +13,7 @@ struct CommentsView: View {
     @State private var showStickerPicker = false
     @State private var showGIFPicker = false
     @State private var reportCommentID: String?
+    @State private var dismissController = KeyboardDismissController()
 
     private var canSend: Bool {
         viewModel.canSubmitDraft
@@ -116,7 +118,7 @@ struct CommentsView: View {
                     Button("Close") { dismiss() }
                 }
             }
-            .keyboardDoneButton(focus: $isComposerFocused)
+            .liquidGlassKeyboardDismiss(controller: dismissController, bottomInset: Self.composerBarHeight)
             .task {
                 viewModel.currentUserAvatarURL = session?.user.avatarURL
                 await viewModel.loadInitial()
@@ -183,7 +185,7 @@ struct CommentsView: View {
                 matching: .images
             ) {
                 Image(systemName: "photo")
-                    .foregroundStyle(remainingAttachmentSlots > 0 ? Color.accentColor : Color.secondary.opacity(0.45))
+                    .foregroundStyle(remainingAttachmentSlots > 0 ? ComposerPalette.monochrome.accent : Color.secondary.opacity(0.45))
             }
             .disabled(remainingAttachmentSlots == 0)
             .accessibilityLabel("Attach photos")
@@ -193,7 +195,7 @@ struct CommentsView: View {
             } label: {
                 Text("GIF")
                     .font(.caption2.weight(.heavy))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(ComposerPalette.monochrome.accent)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("GIF")
@@ -203,7 +205,7 @@ struct CommentsView: View {
                     showStickerPicker = true
                 } label: {
                     Image(systemName: "face.smiling")
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(ComposerPalette.monochrome.accent)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Stickers")
@@ -218,6 +220,7 @@ struct CommentsView: View {
                     Image(systemName: "paperplane.fill")
                 }
             }
+            .tint(ComposerPalette.monochrome.accent)
             .disabled(!canSend)
         }
         .padding()

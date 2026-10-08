@@ -1,0 +1,4 @@
+// Share / universal-link domains for Debug + Staging (ALTON_DEV).
+// Comma-separated list so old + new domains can coexist during a domain cutover.
+SHARE_DOMAIN = alton.social
+SHARE_DOMAINS = alton.social,dev.alton.social

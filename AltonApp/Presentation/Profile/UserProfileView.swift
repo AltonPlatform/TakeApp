@@ -42,6 +42,7 @@ struct UserProfileView: View {
     @State private var peekPost: Post?
     @State private var peekSuppress = ProfilePeekSuppressController()
     @State private var shotsNavigation: ProfileShotsNavigation?
+    @State private var showShareSheet = false
 
     init(
         userID: String?,
@@ -98,6 +99,26 @@ struct UserProfileView: View {
         }
         .navigationTitle(viewModel.profile.map { "@\($0.username)" } ?? "Profile")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if viewModel.profile != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showShareSheet = true
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel("Share profile")
+                }
+            }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let profile = viewModel.profile {
+                ActivityShareSheet(items: [ProfileShareLink.url(forUsername: profile.username)]) { _ in
+                    showShareSheet = false
+                }
+                .presentationDetents([.medium, .large])
+            }
+        }
         .task { await viewModel.load() }
         .refreshable { await viewModel.load() }
         .sheet(isPresented: $showEditProfile) {
@@ -597,6 +618,7 @@ struct EditProfileView: View {
     @State private var viewModel: EditProfileViewModel
     @State private var photoItem: PhotosPickerItem?
     @State private var avatarCrop: PhotoCropDraft?
+    @State private var dismissController = KeyboardDismissController()
     let onSaved: (UserProfile) -> Void
 
     init(profile: UserProfile, userUseCase: UserUseCase, onSaved: @escaping (UserProfile) -> Void) {
@@ -711,7 +733,7 @@ struct EditProfileView: View {
                     .lineLimit(3...6)
             }
             .navigationTitle("Edit Profile")
-            .keyboardDoneButton()
+            .liquidGlassKeyboardDismiss(controller: dismissController)
             .onChange(of: photoItem) { _, item in
                 guard let item else { return }
                 Task {

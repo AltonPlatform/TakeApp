@@ -19,6 +19,7 @@ struct CommentComposerFullScreenView: View {
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var showStickerPicker = false
     @State private var showGIFPicker = false
+    @State private var dismissController = KeyboardDismissController()
 
     init(
         draft: Binding<String>,
@@ -105,14 +106,17 @@ struct CommentComposerFullScreenView: View {
             }
             .navigationTitle("Reply")
             .navigationBarTitleDisplayMode(.inline)
+            .liquidGlassKeyboardDismiss(controller: dismissController, bottomInset: 56)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
+                        .foregroundStyle(ComposerPalette.monochrome.primary)
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button(isPreviewMode ? "Edit" : "Preview") {
                         isPreviewMode.toggle()
                     }
+                    .foregroundStyle(ComposerPalette.monochrome.primary)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -535,6 +539,7 @@ struct CommentGIFPickerSheet: View {
     @State private var errorMessage: String?
     @State private var searchTask: Task<Void, Never>?
     @FocusState private var isSearchFocused: Bool
+    @State private var dismissController = KeyboardDismissController()
 
     private let columns = [
         GridItem(.flexible(), spacing: 8),
@@ -552,7 +557,7 @@ struct CommentGIFPickerSheet: View {
             }
             .navigationTitle("GIF")
             .navigationBarTitleDisplayMode(.inline)
-            .keyboardDoneButton(focus: $isSearchFocused)
+            .liquidGlassKeyboardDismiss(controller: dismissController)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }

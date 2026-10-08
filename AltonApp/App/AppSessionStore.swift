@@ -23,6 +23,11 @@ final class AppSessionStore {
             } else if oldValue != nil, session == nil {
                 AnalyticsReporting.logLogout()
             }
+
+            if session != nil, let username = pendingProfileUsername {
+                pendingProfileUsername = nil
+                Task { await resolveProfileShareLink(username: username) }
+            }
         }
     }
     var pendingDeepLink: DeepLink?
@@ -30,11 +35,20 @@ final class AppSessionStore {
     /// True while cold-start session restoration is in progress.
     /// Prevents a flash of the login screen before refresh completes.
     private(set) var isRestoringSession = true
+    /// Profile share link received before session restore completes.
+    private(set) var pendingProfileUsername: String?
     private let authUseCase: AuthUseCase
+    private let userUseCase: UserUseCase
     private let tokenStore: TokenStoreProtocol
 
-    init(authUseCase: AuthUseCase, tokenStore: TokenStoreProtocol, hasStoredCredentials: Bool) {
+    init(
+        authUseCase: AuthUseCase,
+        userUseCase: UserUseCase,
+        tokenStore: TokenStoreProtocol,
+        hasStoredCredentials: Bool
+    ) {
         self.authUseCase = authUseCase
+        self.userUseCase = userUseCase
         self.tokenStore = tokenStore
         self.isRestoringSession = hasStoredCredentials
     }
@@ -108,6 +122,19 @@ final class AppSessionStore {
     func handleUniversalLink(_ url: URL) async {
         guard url.scheme == "https", let host = url.host?.lowercased() else { return }
 
+        // Content share links: https://{shareDomain}/p/{id}
+        if AppEnvironment.current.shareUniversalHosts.contains(host),
+           let postID = ShareDeepLinkParser.postID(fromPath: url.path) {
+            pendingDeepLink = .post(postID)
+            return
+        }
+
+        if AppEnvironment.current.shareUniversalHosts.contains(host),
+           let username = ShareDeepLinkParser.profileUsername(fromPath: url.path) {
+            await resolveProfileShareLink(username: username)
+            return
+        }
+
         if AppEnvironment.current.shareUniversalHosts.contains(host),
            let inviteCode = ShareDeepLinkParser.inviteCode(fromPath: url.path) {
             storePendingInvite(code: inviteCode)
@@ -115,6 +142,7 @@ final class AppSessionStore {
             return
         }
 
+        // SSO magic links (existing behaviour).
         guard AppEnvironment.current.magicLinkUniversalHosts.contains(host) else {
             return
         }
@@ -213,9 +241,43 @@ final class AppSessionStore {
     private static func isValidResourceID(_ value: String) -> Bool {
         (try? APIEndpoint.validateResourceID(value)) != nil
     }
+
+    private func resolveProfileShareLink(username: String) async {
+        guard session != nil else {
+            pendingProfileUsername = username
+            return
+        }
+        do {
+            let profile = try await userUseCase.loadProfileByUsername(username)
+            pendingDeepLink = .user(profile.id)
+        } catch {
+            // Unknown or blocked profile — ignore silently (matches web 404).
+        }
+    }
 }
 
 enum ShareDeepLinkParser {
+    /// Parses `/p/{ulid}` (optional trailing slash / extra path ignored).
+    static func postID(fromPath path: String) -> String? {
+        let parts = path.split(separator: "/").map(String.init)
+        guard parts.count >= 2, parts[0] == "p" else { return nil }
+        let postID = parts[1]
+        guard (try? APIEndpoint.validateResourceID(postID)) != nil else { return nil }
+        return postID
+    }
+
+    /// Parses `/u/{username}` (optional trailing slash / extra path ignored).
+    static func profileUsername(fromPath path: String) -> String? {
+        let parts = path.split(separator: "/").map(String.init)
+        guard parts.count >= 2, parts[0] == "u" else { return nil }
+        let username = parts[1].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard username.count >= 3, username.count <= 20 else { return nil }
+        guard username.allSatisfy({ ch in
+            ch.isASCII && (ch.isNumber || (ch.isLetter && ch.isLowercase) || ch == "_")
+        }) else { return nil }
+        return username
+    }
+
     static func inviteCode(fromPath path: String) -> String? {
         let parts = path.split(separator: "/").map(String.init)
         guard parts.count >= 2, parts[0] == "i" else { return nil }
@@ -235,5 +297,15 @@ enum ShareDeepLinkParser {
         let nonceOK = nonce.allSatisfy { $0.isLetter || $0.isNumber }
         let sigOK = sig.allSatisfy { $0.isHexDigit }
         return nonceOK && sigOK
+    }
+}
+
+enum ProfileShareLink {
+    static func url(forUsername username: String) -> URL {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = AppEnvironment.current.shareDomain
+        components.path = "/u/\(username)"
+        return components.url!
     }
 }

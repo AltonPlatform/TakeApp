@@ -44,6 +44,8 @@ struct TakePostDetailView: View {
     @State private var mentionPicker: MentionPickerModel
     @State private var didApplyComposerFocus = false
     @FocusState private var isComposerFocused: Bool
+    private static let composerBarHeight: CGFloat = 76
+    @State private var dismissController = KeyboardDismissController()
     @Environment(\.dismiss) private var dismiss
 
     init(
@@ -142,7 +144,7 @@ struct TakePostDetailView: View {
         }
         .background(Color(.systemBackground))
         .navigationBarTitleDisplayMode(.inline)
-        .keyboardDoneButton(focus: $isComposerFocused)
+        .liquidGlassKeyboardDismiss(controller: dismissController, bottomInset: Self.composerBarHeight)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Image("nav.take")
@@ -266,12 +268,15 @@ struct TakePostDetailView: View {
             Text("This can’t be undone.")
         }
         .sheet(isPresented: $showShareSheet) {
-            if let url = engagementController.shareURL {
-                ActivityShareSheet(items: [url]) { completed in
+            if let payload = engagementController.makeSharePayload(for: post) {
+                ActivityShareSheet(payload: payload) { completed, channel in
                     showShareSheet = false
-                    if completed {
+                    if completed, let channel {
                         Task {
-                            post = await engagementController.completeShare(post: post)
+                            post = await engagementController.completeShare(
+                                post: post,
+                                channel: channel
+                            )
                         }
                     }
                 }
@@ -928,10 +933,13 @@ struct TakeDetailCommentRow: View {
         }
         .padding(12)
         .sheet(isPresented: $showShareSheet) {
-            ActivityShareSheet(items: [comment.content]) { _ in
-                showShareSheet = false
+            if let url = PostShareURL.make(postID: comment.postID, commentID: comment.id) {
+                let items: [Any] = comment.content.isEmpty ? [url] : [url, comment.content]
+                ActivityShareSheet(items: items) { _ in
+                    showShareSheet = false
+                }
+                .presentationDetents([.medium, .large])
             }
-            .presentationDetents([.medium, .large])
         }
     }
 

@@ -13,6 +13,12 @@ configs:
   Staging: release
   Release: release
   AppStore: release
+# Per-config share-domain xcconfigs (SHARE_DOMAIN / SHARE_DOMAINS → Info.plist + entitlements).
+configFiles:
+  Debug: AltonApp/Config/ShareDomain.Debug.xcconfig
+  Staging: AltonApp/Config/ShareDomain.Debug.xcconfig
+  Release: AltonApp/Config/ShareDomain.Release.xcconfig
+  AppStore: AltonApp/Config/ShareDomain.Release.xcconfig
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -20,6 +26,9 @@ settings:
     IPHONEOS_DEPLOYMENT_TARGET: "18.0"
     DEVELOPMENT_TEAM: X6GV877JLH
     CODE_SIGN_STYLE: Automatic
+    # Defaults if an xcconfig is missing; overridden by ShareDomain.*.xcconfig.
+    SHARE_DOMAIN: alton.social
+    SHARE_DOMAINS: alton.social
 packages:
   Firebase:
     url: https://github.com/firebase/firebase-ios-sdk

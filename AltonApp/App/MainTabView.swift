@@ -19,6 +19,7 @@ struct MainTabView: View {
     @State private var shotCreation: ShotCreationPresentation?
     @State private var deepLinkProfile: DeepLinkProfilePresentation?
     @State private var deepLinkPost: DeepLinkPostPresentation?
+    @State private var deepLinkShot: DeepLinkShotPresentation?
     @State private var deepLinkError: String?
     @State private var showSearch = false
     @State private var showAgeGenderModal = false
@@ -136,6 +137,10 @@ struct MainTabView: View {
         .onAppear {
             ensureViewModel(for: selectedTab)
             syncContentPreferences()
+            // Cold start / post-login: pendingDeepLink may already be set before onChange fires.
+            if let link = container.sessionStore.pendingDeepLink {
+                Task { await handleDeepLink(link) }
+            }
             Task {
                 await requestNotificationsIfNeeded()
                 await activityViewModel?.refreshUnreadCount()
@@ -216,6 +221,17 @@ struct MainTabView: View {
                     onDeleted: {
                         deepLinkPost = nil
                     }
+                )
+            }
+        }
+        .fullScreenCover(item: $deepLinkShot) { presentation in
+            NavigationStack {
+                ProfileShotsFeedView(
+                    posts: [presentation.post],
+                    initialIndex: 0,
+                    session: session,
+                    container: container,
+                    isOwnProfile: presentation.post.creatorID == session.user.id
                 )
             }
         }
@@ -496,12 +512,6 @@ struct MainTabView: View {
         case .user(let userID):
             deepLinkProfile = DeepLinkProfilePresentation(userID: userID)
         case .post(let postID):
-            ensureViewModel(for: .takes)
-            selectedTab = .takes
-            guard let takesViewModel else {
-                deepLinkError = "This post couldn't be opened. Please try again."
-                return
-            }
             do {
                 let post = try await container.postUseCase.fetchPost(id: postID)
                 if let blocked = ViewerContentFilterPolicy.blockedOpenMessage(
@@ -510,6 +520,18 @@ struct MainTabView: View {
                     showSensitiveContent: liveSession.user.showSensitiveContent
                 ) {
                     deepLinkError = blocked
+                    return
+                }
+                if post.postType == .shot {
+                    ensureViewModel(for: .shots)
+                    selectedTab = .shots
+                    deepLinkShot = DeepLinkShotPresentation(post: post)
+                    return
+                }
+                ensureViewModel(for: .takes)
+                selectedTab = .takes
+                guard let takesViewModel else {
+                    deepLinkError = "This post couldn't be opened. Please try again."
                     return
                 }
                 let item = FeedItem(
@@ -561,4 +583,9 @@ private struct DeepLinkPostPresentation: Identifiable {
     let item: FeedItem
     let engagementController: PostEngagementController
     let makeCommentsViewModel: (Post) -> CommentsViewModel
+}
+
+private struct DeepLinkShotPresentation: Identifiable {
+    var id: String { post.id }
+    let post: Post
 }

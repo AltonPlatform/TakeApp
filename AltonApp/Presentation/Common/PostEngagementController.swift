@@ -97,9 +97,9 @@ final class PostEngagementController {
     }
 
     @discardableResult
-    func completeShare(post: Post) async -> Post {
+    func completeShare(post: Post, channel: String = "external") async -> Post {
         do {
-            let result = try await engagementUseCase.recordShare(postID: post.id)
+            let result = try await engagementUseCase.recordShare(postID: post.id, channel: channel)
             if result.newlyRecorded {
                 let updated = post.updatingEngagement(shareCount: result.shareCount)
                 onPostUpdated?(updated)
@@ -112,10 +112,20 @@ final class PostEngagementController {
         }
     }
 
+    /// Builds a share payload from the last prepared URL and post metadata.
+    func makeSharePayload(for post: Post) -> PostSharePayload? {
+        guard let url = shareURL else { return nil }
+        return PostSharePayload(
+            url: url,
+            textExcerpt: post.content,
+            username: post.creatorUsername
+        )
+    }
+
     @discardableResult
-    func share(post: Post) async -> Post {
+    func share(post: Post, channel: String = "external") async -> Post {
         do {
-            let result = try await engagementUseCase.recordShare(postID: post.id)
+            let result = try await engagementUseCase.recordShare(postID: post.id, channel: channel)
             shareURL = result.shareURL
             if result.newlyRecorded {
                 let updated = post.updatingEngagement(shareCount: result.shareCount)

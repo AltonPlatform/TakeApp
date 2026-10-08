@@ -122,6 +122,7 @@ struct LocationPickerSheet: View {
     @Binding var selected: CameraViewModel.SelectedLocation?
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model = LocationPickerModel()
+    @State private var dismissController = KeyboardDismissController()
 
     var body: some View {
         NavigationStack {
@@ -172,7 +173,7 @@ struct LocationPickerSheet: View {
             .padding(.top, 8)
             .navigationTitle("Розташування")
             .navigationBarTitleDisplayMode(.inline)
-            .keyboardDoneButton()
+            .liquidGlassKeyboardDismiss(controller: dismissController)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Закрити") { dismiss() }

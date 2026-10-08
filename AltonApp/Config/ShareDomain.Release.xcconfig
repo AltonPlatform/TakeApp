@@ -1,0 +1,3 @@
+// Share / universal-link domains for Release + AppStore.
+SHARE_DOMAIN = alton.social
+SHARE_DOMAINS = alton.social

@@ -12,6 +12,8 @@
 	</array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>applinks:$(SHARE_DOMAIN)</string>
+		<string>applinks:dev.alton.social</string>
 		<string>applinks:dev-sso.altons.trade</string>
 		<string>webcredentials:dev-sso.altons.trade</string>
 	</array>
