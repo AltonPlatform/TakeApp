@@ -28,4 +28,12 @@ final class ShareDeepLinkTests: XCTestCase {
         let url = PostShareURL.make(postID: postID, domain: "alton.social")
         XCTAssertEqual(url?.absoluteString, "https://alton.social/p/\(postID)")
     }
+
+    func testProfileUsernameFromSharePath() {
+        XCTAssertEqual(ShareDeepLinkParser.profileUsername(fromPath: "/u/alice"), "alice")
+        XCTAssertEqual(ShareDeepLinkParser.profileUsername(fromPath: "/u/Alice/"), "alice")
+        XCTAssertNil(ShareDeepLinkParser.profileUsername(fromPath: "/p/alice"))
+        XCTAssertNil(ShareDeepLinkParser.profileUsername(fromPath: "/u/ab"))
+        XCTAssertNil(ShareDeepLinkParser.profileUsername(fromPath: "/u/bad-name"))
+    }
 }
