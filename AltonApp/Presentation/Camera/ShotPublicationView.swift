@@ -12,6 +12,7 @@ struct ShotPublicationView: View {
     @State private var showHashtagSheet = false
     @State private var hashtagQuery = ""
     @State private var draftSavedToast = false
+    @State private var dismissController = KeyboardDismissController()
 
     var body: some View {
         ZStack {
@@ -41,7 +42,7 @@ struct ShotPublicationView: View {
                     .transition(.opacity)
             }
         }
-        .keyboardDoneButton()
+        .liquidGlassKeyboardDismiss(controller: dismissController)
         .sheet(isPresented: $showCoverPicker) {
             CoverFramePicker(videoURL: videoURL, selectedTime: $viewModel.thumbnailTime, coverImage: $viewModel.coverImage)
         }

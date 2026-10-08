@@ -171,6 +171,7 @@ private struct AuthProviderButton: View {
 private struct PasskeySheet: View {
     @Bindable var viewModel: AuthViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var dismissController = KeyboardDismissController()
 
     var body: some View {
         NavigationStack {
@@ -203,7 +204,7 @@ private struct PasskeySheet: View {
             }
             .navigationTitle("Passkey")
             .navigationBarTitleDisplayMode(.inline)
-            .keyboardDoneButton()
+            .liquidGlassKeyboardDismiss(controller: dismissController)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -220,6 +221,7 @@ private struct PasskeySheet: View {
 private struct MagicLinkSheet: View {
     @Bindable var viewModel: AuthViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var dismissController = KeyboardDismissController()
 
     var body: some View {
         NavigationStack {
@@ -256,7 +258,7 @@ private struct MagicLinkSheet: View {
             }
             .navigationTitle("Magic Link")
             .navigationBarTitleDisplayMode(.inline)
-            .keyboardDoneButton()
+            .liquidGlassKeyboardDismiss(controller: dismissController)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

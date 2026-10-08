@@ -7,11 +7,13 @@ extension View {
     }
 
     /// Adds a keyboard accessory "Done" button that resigns first responder.
+    @available(*, deprecated, message: "Use .liquidGlassKeyboardDismiss(controller:) instead")
     func keyboardDoneButton() -> some View {
         modifier(KeyboardDoneButtonModifier())
     }
 
     /// Adds a keyboard accessory "Done" button that clears a FocusState.
+    @available(*, deprecated, message: "Use .liquidGlassKeyboardDismiss(controller:) instead")
     func keyboardDoneButton(focus: FocusState<Bool>.Binding) -> some View {
         modifier(KeyboardDoneFocusModifier(focus: focus))
     }

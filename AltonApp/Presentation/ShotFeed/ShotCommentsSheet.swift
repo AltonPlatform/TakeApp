@@ -427,6 +427,8 @@ private struct ShotCommentsSheetContent: View {
     @State private var showStickerPicker = false
     @State private var showGIFPicker = false
     @State private var reportCommentID: String?
+    private static let composerBarHeight: CGFloat = 64
+    @State private var dismissController = KeyboardDismissController()
 
     init(
         viewModel: CommentsViewModel,
@@ -563,7 +565,7 @@ private struct ShotCommentsSheetContent: View {
                 composer
             }
             .navigationBarHidden(true)
-            .keyboardDoneButton(focus: $isComposerFocused)
+            .liquidGlassKeyboardDismiss(controller: dismissController, bottomInset: Self.composerBarHeight)
             .onChange(of: viewModel.draft) { _, newValue in
                 mentionPicker.update(from: newValue)
             }
@@ -722,7 +724,7 @@ private struct ShotCommentsSheetContent: View {
                 } else {
                     Image(systemName: "paperplane.fill")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(canSend ? Color.accentColor : Color.secondary.opacity(0.45))
+                        .foregroundStyle(canSend ? ComposerPalette.monochrome.accent : Color.secondary.opacity(0.45))
                         .frame(width: 28, height: 28)
                 }
             }

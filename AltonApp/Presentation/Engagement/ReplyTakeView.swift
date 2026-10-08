@@ -77,6 +77,8 @@ struct ReplyTakeView: View {
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var showGIFPicker = false
     @FocusState private var isComposerFocused: Bool
+    private static let composerBarHeight: CGFloat = 64
+    @State private var dismissController = KeyboardDismissController()
 
     init(
         viewModel: CommentsViewModel,
@@ -211,7 +213,7 @@ struct ReplyTakeView: View {
         }
         .navigationTitle("Reply")
         .navigationBarTitleDisplayMode(.inline)
-        .keyboardDoneButton(focus: $isComposerFocused)
+        .liquidGlassKeyboardDismiss(controller: dismissController, bottomInset: Self.composerBarHeight)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
@@ -279,12 +281,15 @@ struct ReplyTakeView: View {
             }
         }
         .sheet(isPresented: $showShareSheet) {
-            if let url = engagementController.shareURL {
-                ActivityShareSheet(items: [url]) { completed in
+            if let payload = engagementController.makeSharePayload(for: localPost) {
+                ActivityShareSheet(payload: payload) { completed, channel in
                     showShareSheet = false
-                    if completed {
+                    if completed, let channel {
                         Task {
-                            localPost = await engagementController.completeShare(post: localPost)
+                            localPost = await engagementController.completeShare(
+                                post: localPost,
+                                channel: channel
+                            )
                         }
                     }
                 }
@@ -448,7 +453,7 @@ struct ReplyTakeView: View {
                 } else {
                     Image(systemName: "paperplane.fill")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(canSend ? Color.accentColor : Color.secondary.opacity(0.45))
+                        .foregroundStyle(canSend ? ComposerPalette.monochrome.accent : Color.secondary.opacity(0.45))
                         .frame(width: 28, height: 28)
                 }
             }

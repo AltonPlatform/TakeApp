@@ -8,32 +8,31 @@ struct ComposerAttachmentStrip: View {
     var onRemove: (PostAttachment) -> Void
     var onEdit: ((PostAttachment) -> Void)? = nil
     var onAddPhotos: (() -> Void)? = nil
+    /// Drag-and-drop reorder (`from`, `to` indices). Nil disables dragging.
+    /// The owner applies it with `AttachmentReorder.move` to its own attachments storage.
+    var onMove: ((Int, Int) -> Void)? = nil
+    /// `.legacy` keeps the original look for comment/reply composers; only the take composer opts into `.takeComposer`.
+    var style: AttachmentStripStyle = .legacy
 
     private let thumbSize: CGFloat = 88
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
-                ForEach(attachments) { attachment in
+                ForEach(Array(attachments.enumerated()), id: \.element.id) { index, attachment in
                     ComposerAttachmentThumb(
                         attachment: attachment,
                         size: thumbSize,
                         onRemove: { onRemove(attachment) },
-                        onEdit: attachment.playsAsAnimation ? nil : { onEdit?(attachment) }
+                        onEdit: attachment.playsAsAnimation ? nil : { onEdit?(attachment) },
+                        style: style
                     )
+                    .reorderable(index: index, onMove: onMove)
                 }
 
                 if remainingSlots > 0, let onAddPhotos {
                     Button(action: onAddPhotos) {
-                        VStack(spacing: 6) {
-                            Image(systemName: "plus")
-                                .font(.title3.weight(.semibold))
-                            Text("Add")
-                                .font(.caption2.weight(.semibold))
-                        }
-                        .foregroundStyle(.secondary)
-                        .frame(width: thumbSize, height: thumbSize)
-                        .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        addTile
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Add photos")
@@ -42,6 +41,44 @@ struct ComposerAttachmentStrip: View {
             .padding(.vertical, 2)
         }
     }
+
+    @ViewBuilder
+    private var addTile: some View {
+        switch style {
+        case .legacy:
+            VStack(spacing: 6) {
+                Image(systemName: "plus")
+                    .font(.title3.weight(.semibold))
+                Text("Add")
+                    .font(.caption2.weight(.semibold))
+            }
+            .foregroundStyle(.secondary)
+            .frame(width: thumbSize, height: thumbSize)
+            .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        case .takeComposer:
+            VStack(spacing: 6) {
+                AttachmentStripGlyph(kind: .plus)
+                    .stroke(AttachmentStripTokens.addForeground, style: AttachmentStripTokens.glyphStroke)
+                    .frame(width: 22, height: 22)
+                Text("Add")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(AttachmentStripTokens.addForeground)
+            }
+            .frame(width: thumbSize, height: thumbSize)
+            .background(
+                AttachmentStripTokens.addBackground,
+                in: RoundedRectangle(cornerRadius: AttachmentStripTokens.cornerRadius, style: .continuous)
+            )
+        }
+    }
+}
+
+/// Visual treatment of `ComposerAttachmentStrip`.
+enum AttachmentStripStyle: Equatable {
+    /// Original thumbs (comment/reply composers).
+    case legacy
+    /// Take-composer redesign.
+    case takeComposer
 }
 
 private struct ComposerAttachmentThumb: View {
@@ -49,10 +86,15 @@ private struct ComposerAttachmentThumb: View {
     let size: CGFloat
     let onRemove: () -> Void
     var onEdit: (() -> Void)? = nil
+    var style: AttachmentStripStyle = .legacy
 
     @State private var decodedImage: UIImage?
     @State private var gifTempURL: URL?
     @State private var gifTooLarge = false
+
+    private var cornerRadius: CGFloat {
+        style == .legacy ? 12 : AttachmentStripTokens.cornerRadius
+    }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -82,10 +124,10 @@ private struct ComposerAttachmentThumb: View {
             }
             .frame(width: size, height: size)
             .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color(.separator).opacity(0.45), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(borderColor, lineWidth: 0.5)
             }
             .contentShape(Rectangle())
             .onTapGesture {
@@ -104,6 +146,22 @@ private struct ComposerAttachmentThumb: View {
                     .allowsHitTesting(false)
             }
 
+            removeButton
+        }
+        .frame(width: size, height: size)
+        .task(id: attachment.id) {
+            await preparePreview()
+        }
+    }
+
+    private var borderColor: Color {
+        style == .legacy ? Color(.separator).opacity(0.45) : AttachmentStripTokens.border
+    }
+
+    @ViewBuilder
+    private var removeButton: some View {
+        switch style {
+        case .legacy:
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.body)
@@ -112,10 +170,24 @@ private struct ComposerAttachmentThumb: View {
             }
             .offset(x: 6, y: -6)
             .accessibilityLabel("Remove photo")
-        }
-        .frame(width: size, height: size)
-        .task(id: attachment.id) {
-            await preparePreview()
+        case .takeComposer:
+            Button(action: onRemove) {
+                ZStack {
+                    Circle()
+                        .fill(AttachmentStripTokens.removeBackground)
+                        .overlay(Circle().strokeBorder(AttachmentStripTokens.border, lineWidth: 0.5))
+                    AttachmentStripGlyph(kind: .xmark)
+                        .stroke(AttachmentStripTokens.removeForeground, style: AttachmentStripTokens.glyphStroke)
+                        .padding(5)
+                }
+                .frame(width: 18, height: 18)
+                // Keep a comfortable touch target around the small circle.
+                .padding(6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(2)
+            .accessibilityLabel("Remove photo")
         }
     }
 
@@ -151,6 +223,96 @@ private struct ComposerAttachmentThumb: View {
         guard let gifTempURL else { return }
         try? FileManager.default.removeItem(at: gifTempURL)
         self.gifTempURL = nil
+    }
+}
+
+// MARK: - Reorder
+
+/// Pure helpers for reordering/removing attachments (testable without UI).
+enum AttachmentReorder {
+    /// Removes the element at `from` and inserts it at `to`.
+    /// Out-of-bounds indices return `items` unchanged.
+    static func move<T>(_ items: [T], from: Int, to: Int) -> [T] {
+        guard items.indices.contains(from), items.indices.contains(to), from != to else { return items }
+        var result = items
+        let element = result.remove(at: from)
+        result.insert(element, at: to)
+        return result
+    }
+
+    /// Removes the element at `index`. Out-of-bounds returns `items` unchanged.
+    static func remove<T>(_ items: [T], at index: Int) -> [T] {
+        guard items.indices.contains(index) else { return items }
+        var result = items
+        result.remove(at: index)
+        return result
+    }
+
+    /// Drag payload for a thumb index. Prefixed so unrelated dropped text is never read as an index.
+    private static let payloadPrefix = "alton.attachment-index:"
+
+    static func payload(forIndex index: Int) -> String { payloadPrefix + String(index) }
+
+    static func index(fromPayload payload: String) -> Int? {
+        guard payload.hasPrefix(payloadPrefix) else { return nil }
+        return Int(payload.dropFirst(payloadPrefix.count))
+    }
+}
+
+private extension View {
+    /// Adds `.draggable` + `.dropDestination` index-based reorder when `onMove` is set.
+    @ViewBuilder
+    func reorderable(index: Int, onMove: ((Int, Int) -> Void)?) -> some View {
+        if let onMove {
+            self
+                .draggable(AttachmentReorder.payload(forIndex: index))
+                .dropDestination(for: String.self) { payloads, _ in
+                    guard let payload = payloads.first,
+                          let from = AttachmentReorder.index(fromPayload: payload)
+                    else { return false }
+                    onMove(from, index)
+                    return true
+                }
+        } else {
+            self
+        }
+    }
+}
+
+// MARK: - Style
+
+/// `.takeComposer` strip tokens — colors come from `ComposerPalette.monochrome`; `.legacy` keeps its own system colors.
+private enum AttachmentStripTokens {
+    static let cornerRadius: CGFloat = 8
+    static let border = ComposerPalette.monochrome.divider
+    static let addBackground = ComposerPalette.monochrome.activeFill
+    static let addForeground = ComposerPalette.monochrome.muted
+    static let removeForeground = ComposerPalette.monochrome.primary
+    static let removeBackground = ComposerPalette.monochrome.onPrimary
+    static let glyphStroke = StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+}
+
+/// Outline `xmark` / `plus` matching the `ComposerIcon` stroke style (no fill).
+private struct AttachmentStripGlyph: Shape {
+    enum Kind { case xmark, plus }
+    let kind: Kind
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let inset = rect.insetBy(dx: rect.width * 0.2, dy: rect.height * 0.2)
+        switch kind {
+        case .xmark:
+            p.move(to: CGPoint(x: inset.minX, y: inset.minY))
+            p.addLine(to: CGPoint(x: inset.maxX, y: inset.maxY))
+            p.move(to: CGPoint(x: inset.maxX, y: inset.minY))
+            p.addLine(to: CGPoint(x: inset.minX, y: inset.maxY))
+        case .plus:
+            p.move(to: CGPoint(x: inset.minX, y: rect.midY))
+            p.addLine(to: CGPoint(x: inset.maxX, y: rect.midY))
+            p.move(to: CGPoint(x: rect.midX, y: inset.minY))
+            p.addLine(to: CGPoint(x: rect.midX, y: inset.maxY))
+        }
+        return p
     }
 }
 
@@ -785,12 +947,15 @@ struct ImageImmersiveViewer: View {
             zoomedPageIndex = nil
         }
         .sheet(isPresented: $showShareSheet) {
-            if let url = engagementController.shareURL {
-                ActivityShareSheet(items: [url]) { completed in
+            if let payload = engagementController.makeSharePayload(for: post) {
+                ActivityShareSheet(payload: payload) { completed, channel in
                     showShareSheet = false
-                    if completed {
+                    if completed, let channel {
                         Task {
-                            post = await engagementController.completeShare(post: post)
+                            post = await engagementController.completeShare(
+                                post: post,
+                                channel: channel
+                            )
                             onPostChange(post)
                         }
                     }
