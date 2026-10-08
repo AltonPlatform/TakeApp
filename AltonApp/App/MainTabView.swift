@@ -507,6 +507,8 @@ struct MainTabView: View {
     private func handleDeepLink(_ link: DeepLink) async {
         container.sessionStore.clearPendingDeepLink()
         switch link {
+        case .invite:
+            return
         case .user(let userID):
             deepLinkProfile = DeepLinkProfilePresentation(userID: userID)
         case .post(let postID):

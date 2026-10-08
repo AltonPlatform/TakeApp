@@ -4,6 +4,7 @@ import Observation
 enum DeepLink: Equatable, Sendable {
     case post(String)
     case user(String)
+    case invite(String)
 }
 
 @MainActor
@@ -134,6 +135,13 @@ final class AppSessionStore {
             return
         }
 
+        if AppEnvironment.current.shareUniversalHosts.contains(host),
+           let inviteCode = ShareDeepLinkParser.inviteCode(fromPath: url.path) {
+            storePendingInvite(code: inviteCode)
+            pendingDeepLink = .invite(inviteCode)
+            return
+        }
+
         // SSO magic links (existing behaviour).
         guard AppEnvironment.current.magicLinkUniversalHosts.contains(host) else {
             return
@@ -215,9 +223,19 @@ final class AppSessionStore {
             if Self.isValidResourceID(userID) {
                 pendingDeepLink = .user(userID)
             }
+        case "invite", "i":
+            let code = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            if ShareDeepLinkParser.isValidInviteCode(code) {
+                storePendingInvite(code: code)
+                pendingDeepLink = .invite(code)
+            }
         default:
             break
         }
+    }
+
+    private func storePendingInvite(code: String) {
+        try? PendingInviteStore.save(code)
     }
 
     private static func isValidResourceID(_ value: String) -> Bool {
@@ -258,6 +276,27 @@ enum ShareDeepLinkParser {
             ch.isASCII && (ch.isNumber || (ch.isLetter && ch.isLowercase) || ch == "_")
         }) else { return nil }
         return username
+    }
+
+    static func inviteCode(fromPath path: String) -> String? {
+        let parts = path.split(separator: "/").map(String.init)
+        guard parts.count >= 2, parts[0] == "i" else { return nil }
+        let code = parts[1]
+        return isValidInviteCode(code) ? code : nil
+    }
+
+    static func isValidInviteCode(_ code: String) -> Bool {
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count <= 32 else { return false }
+        let segments = trimmed.split(separator: ".", omittingEmptySubsequences: false)
+        guard segments.count == 2 else { return false }
+        let nonce = segments[0]
+        let sig = segments[1]
+        guard (6...12).contains(nonce.count) else { return false }
+        guard sig.count == 16 else { return false }
+        let nonceOK = nonce.allSatisfy { $0.isLetter || $0.isNumber }
+        let sigOK = sig.allSatisfy { $0.isHexDigit }
+        return nonceOK && sigOK
     }
 }
 
