@@ -66,6 +66,35 @@ enum AppEnvironment {
         }
     }
 
+    /// Primary share domain from xcconfig → Info.plist (`AltonShareDomain`).
+    var shareDomain: String {
+        if let value = Bundle.main.object(forInfoDictionaryKey: "AltonShareDomain") as? String {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty, !trimmed.hasPrefix("$(") {
+                return trimmed
+            }
+        }
+        return "alton.social"
+    }
+
+    /// All share hosts accepted by `handleUniversalLink` (comma-separated `AltonShareDomains`).
+    var shareUniversalHosts: Set<String> {
+        var hosts = Set<String>()
+        hosts.insert(shareDomain.lowercased())
+        if let raw = Bundle.main.object(forInfoDictionaryKey: "AltonShareDomains") as? String {
+            for part in raw.split(separator: ",") {
+                let host = part.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if !host.isEmpty, !host.hasPrefix("$(") {
+                    hosts.insert(host)
+                }
+            }
+        }
+        // Always accept the current prod share domain so old builds keep opening new links
+        // and vice versa during a domain cutover.
+        hosts.insert("alton.social")
+        return hosts
+    }
+
     var trustedUploadHosts: Set<String> {
         switch self {
         case .development:

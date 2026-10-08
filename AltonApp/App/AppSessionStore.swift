@@ -105,8 +105,17 @@ final class AppSessionStore {
     }
 
     func handleUniversalLink(_ url: URL) async {
-        guard url.scheme == "https",
-              AppEnvironment.current.magicLinkUniversalHosts.contains(url.host ?? "") else {
+        guard url.scheme == "https", let host = url.host?.lowercased() else { return }
+
+        // Content share links: https://{shareDomain}/p/{id}
+        if AppEnvironment.current.shareUniversalHosts.contains(host),
+           let postID = ShareDeepLinkParser.postID(fromPath: url.path) {
+            pendingDeepLink = .post(postID)
+            return
+        }
+
+        // SSO magic links (existing behaviour).
+        guard AppEnvironment.current.magicLinkUniversalHosts.contains(host) else {
             return
         }
 
@@ -193,5 +202,16 @@ final class AppSessionStore {
 
     private static func isValidResourceID(_ value: String) -> Bool {
         (try? APIEndpoint.validateResourceID(value)) != nil
+    }
+}
+
+enum ShareDeepLinkParser {
+    /// Parses `/p/{ulid}` (optional trailing slash / extra path ignored).
+    static func postID(fromPath path: String) -> String? {
+        let parts = path.split(separator: "/").map(String.init)
+        guard parts.count >= 2, parts[0] == "p" else { return nil }
+        let postID = parts[1]
+        guard (try? APIEndpoint.validateResourceID(postID)) != nil else { return nil }
+        return postID
     }
 }
