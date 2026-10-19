@@ -1,5 +1,37 @@
 import Foundation
 
+/// TikTok-style inbox notification category (server-side filter).
+enum NotificationCategory: String, Sendable, Hashable, CaseIterable {
+    case followers
+    case activity
+    case system
+
+    var title: String {
+        switch self {
+        case .followers: return "New followers"
+        case .activity: return "Activity"
+        case .system: return "System notifications"
+        }
+    }
+
+    /// Short label for inbox category chips.
+    var shortTitle: String {
+        switch self {
+        case .followers: return "Followers"
+        case .activity: return "Activity"
+        case .system: return "System"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .followers: return "person.badge.plus.fill"
+        case .activity: return "heart.fill"
+        case .system: return "bell.badge.fill"
+        }
+    }
+}
+
 enum NotificationKind: String, Sendable, CaseIterable {
     case like
     case comment

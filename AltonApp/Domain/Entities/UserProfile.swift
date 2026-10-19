@@ -6,6 +6,8 @@ struct UserProfile: Equatable, Identifiable, Sendable {
     let displayName: String
     let bio: String?
     let avatarURL: URL?
+    /// Full-resolution avatar (1024); falls back to avatarURL when absent.
+    let avatarFullURL: URL?
     let suiWallet: String?
     let createdAt: Date?
     var followerCount: Int
@@ -26,6 +28,7 @@ struct UserProfile: Equatable, Identifiable, Sendable {
         displayName: String,
         bio: String?,
         avatarURL: URL?,
+        avatarFullURL: URL? = nil,
         suiWallet: String?,
         createdAt: Date?,
         followerCount: Int,
@@ -45,6 +48,7 @@ struct UserProfile: Equatable, Identifiable, Sendable {
         self.displayName = displayName
         self.bio = bio
         self.avatarURL = avatarURL
+        self.avatarFullURL = avatarFullURL
         self.suiWallet = suiWallet
         self.createdAt = createdAt
         self.followerCount = followerCount

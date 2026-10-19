@@ -11,6 +11,8 @@ final class TakesFeedViewModel {
     var isLoading = false
     var isLoadingMore = false
     var errorMessage: String?
+    /// True when the server returned no next_cursor — catalog walk finished.
+    var isExhausted = false
     /// Client-side fallback when server filter is off / lagging.
     var showSensitiveContent = false
     /// Client-side age gate: hide age-gated posts when viewer is not 18+.
@@ -18,6 +20,7 @@ final class TakesFeedViewModel {
     private var nextCursor: String?
     private var hasLoaded = false
     private var window = WindowedFeed<FeedTimelineItem>(windowSize: 100)
+    private let maxEmptyPageContinues = 3
     // Read from `deinit`; stored `nonisolated` is illegal on @Observable properties.
     @ObservationIgnored private nonisolated(unsafe) var memoryWarningObserver: NSObjectProtocol?
 
@@ -134,11 +137,12 @@ final class TakesFeedViewModel {
         }
 
         do {
-            let page = try await feedUseCase.fetchTakes(cursor: nil, mode: feedMode)
+            let page = try await fetchTakesPage(cursor: nil)
             window.replaceAll(page.items)
             items = window.items
             adSlots = page.adSlots
             nextCursor = page.nextCursor
+            isExhausted = page.nextCursor == nil || page.nextCursor?.isEmpty == true
             // Drop prior feed's thumb/full work before warming the new page.
             FeedImagePrefetcher.shared.stopAll()
             prefetchThumbs(for: page.items)
@@ -154,6 +158,7 @@ final class TakesFeedViewModel {
         items = []
         adSlots = []
         nextCursor = nil
+        isExhausted = false
         hasLoaded = false
         FeedImagePrefetcher.shared.stopAll()
         await loadInitial()
@@ -161,11 +166,12 @@ final class TakesFeedViewModel {
 
     func refresh() async {
         nextCursor = nil
+        isExhausted = false
         await loadInitial()
     }
 
     func loadMoreIfNeeded(currentItem: FeedTimelineItem) async {
-        guard let nextCursor, !nextCursor.isEmpty, !isLoadingMore else { return }
+        guard let nextCursor, !nextCursor.isEmpty, !isLoadingMore, !isExhausted else { return }
         // Compare against the last *visible* row — filtered sensitive items sit in `items`
         // but never appear in the UI, so anchoring on `items.last` would stall pagination.
         guard visibleItems.last?.id == currentItem.id else { return }
@@ -178,18 +184,46 @@ final class TakesFeedViewModel {
                 if case .post = item { return partial + 1 }
                 return partial
             }
-            let page = try await feedUseCase.fetchTakes(cursor: nextCursor, mode: feedMode)
+            let page = try await fetchTakesPage(cursor: nextCursor)
+            let existingIDs = Set(items.map(\.id))
+            let unique = page.items.filter { !existingIDs.contains($0.id) }
             // Focus near the end — user is loading more while scrolled down.
-            _ = window.append(page.items, around: max(0, window.items.count - 1))
+            _ = window.append(unique, around: max(0, window.items.count - 1))
             items = window.items
             let offsetSlots = page.adSlots.map {
                 FeedAdSlot(placementID: $0.placementID, position: $0.position + postCountBefore)
             }
             adSlots.append(contentsOf: offsetSlots)
             self.nextCursor = page.nextCursor
+            isExhausted = page.nextCursor == nil || page.nextCursor?.isEmpty == true
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
+    }
+
+    /// Fetch a page; if the server returns an empty/short page with a cursor, continue
+    /// up to `maxEmptyPageContinues` times so filtered batches do not stall the UI.
+    private func fetchTakesPage(cursor: String?) async throws -> FeedPage {
+        var cursor = cursor
+        var mergedItems: [FeedTimelineItem] = []
+        var mergedAds: [FeedAdSlot] = []
+        var lastCursor: String? = cursor
+        var continues = 0
+
+        repeat {
+            let page = try await feedUseCase.fetchTakes(cursor: cursor, mode: feedMode)
+            mergedItems.append(contentsOf: page.items)
+            mergedAds.append(contentsOf: page.adSlots)
+            lastCursor = page.nextCursor
+            let hasMore = page.nextCursor.map { !$0.isEmpty } ?? false
+            if !page.items.isEmpty || !hasMore {
+                break
+            }
+            continues += 1
+            cursor = page.nextCursor
+        } while continues < maxEmptyPageContinues
+
+        return FeedPage(items: mergedItems, nextCursor: lastCursor, adSlots: mergedAds)
     }
 
     func removePost(id: String) {

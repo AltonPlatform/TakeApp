@@ -74,21 +74,26 @@ struct ProfileShotsFeedView: View {
     let container: DependencyContainer
     /// When true, sensitive/age-gated posts stay visible (owner viewing own profile).
     var isOwnProfile: Bool = false
+    /// The player covers the navigation bar, so a modal or pushed shot needs its own back control.
+    var showsDismissButton: Bool = false
 
     @State private var currentIndex: Int
     @State private var engagementController: PostEngagementController
     @State private var profileUserID: String?
+    @Environment(\.dismiss) private var dismiss
 
     init(
         posts: [Post],
         initialIndex: Int,
         session: AuthSession,
         container: DependencyContainer,
-        isOwnProfile: Bool = false
+        isOwnProfile: Bool = false,
+        showsDismissButton: Bool = false
     ) {
         self.session = session
         self.container = container
         self.isOwnProfile = isOwnProfile
+        self.showsDismissButton = showsDismissButton
         let filtered = ViewerContentFilterPolicy.filterPosts(
             posts,
             viewerIsAdult: session.user.isAdult,
@@ -134,7 +139,24 @@ struct ProfileShotsFeedView: View {
             UserProfileView(userID: userID, session: session, container: container, initialTab: .shots)
         }
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(showsDismissButton)
         .toolbarBackground(.hidden, for: .navigationBar)
+        .overlay(alignment: .topLeading) {
+            if showsDismissButton {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.backward")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
+                        .background(.black.opacity(0.55), in: Circle())
+                }
+                .padding(.leading, 12)
+                .padding(.top, 8)
+                .accessibilityLabel("Back")
+            }
+        }
     }
 }
 
@@ -445,20 +467,19 @@ struct ShotFeedPageView: View {
             }
         }
         .onDisappear { sendWatchTime() }
-        .sheet(isPresented: $showShareSheet) {
-            if let payload = engagementController.makeSharePayload(for: post) {
-                ActivityShareSheet(payload: payload) { completed, channel in
-                    showShareSheet = false
-                    if completed, let channel {
-                        Task {
-                            post = await engagementController.completeShare(
-                                post: post,
-                                channel: channel
-                            )
-                        }
-                    }
+        .postShareSheet(
+            isPresented: $showShareSheet,
+            payload: engagementController.makeSharePayload(for: post),
+            directShare: container.makeDirectShareDependencies(currentUserID: currentUser.id)
+        ) { completed, channel in
+            showShareSheet = false
+            if completed, let channel {
+                Task {
+                    post = await engagementController.completeShare(
+                        post: post,
+                        channel: channel
+                    )
                 }
-                .presentationDetents([.medium, .large])
             }
         }
         .sheet(isPresented: $showOptionsMenu) {

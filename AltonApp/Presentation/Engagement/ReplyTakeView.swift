@@ -280,20 +280,18 @@ struct ReplyTakeView: View {
                 viewModel.enqueuePickedGIF(gif)
             }
         }
-        .sheet(isPresented: $showShareSheet) {
-            if let payload = engagementController.makeSharePayload(for: localPost) {
-                ActivityShareSheet(payload: payload) { completed, channel in
-                    showShareSheet = false
-                    if completed, let channel {
-                        Task {
-                            localPost = await engagementController.completeShare(
-                                post: localPost,
-                                channel: channel
-                            )
-                        }
-                    }
+        .postShareSheet(
+            isPresented: $showShareSheet,
+            payload: engagementController.makeSharePayload(for: localPost)
+        ) { completed, channel in
+            showShareSheet = false
+            if completed, let channel {
+                Task {
+                    localPost = await engagementController.completeShare(
+                        post: localPost,
+                        channel: channel
+                    )
                 }
-                .presentationDetents([.medium, .large])
             }
         }
         .alert("Error", isPresented: Binding(

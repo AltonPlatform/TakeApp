@@ -24,6 +24,11 @@ private struct ProfileShotsNavigation: Identifiable, Hashable {
     var id: String { postID }
 }
 
+private struct AvatarLightboxURL: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
+}
+
 struct UserProfileView: View {
     @State private var viewModel: UserProfileViewModel
     let session: AuthSession
@@ -43,6 +48,9 @@ struct UserProfileView: View {
     @State private var peekSuppress = ProfilePeekSuppressController()
     @State private var shotsNavigation: ProfileShotsNavigation?
     @State private var showShareSheet = false
+    @State private var chatConversation: DMConversation?
+    @State private var isOpeningChat = false
+    @State private var fullscreenAvatar: AvatarLightboxURL?
 
     init(
         userID: String?,
@@ -111,6 +119,9 @@ struct UserProfileView: View {
                 }
             }
         }
+        .fullScreenCover(item: $fullscreenAvatar) { item in
+            ImageLightboxView(urls: [item.url], initialIndex: 0)
+        }
         .sheet(isPresented: $showShareSheet) {
             if let profile = viewModel.profile {
                 ActivityShareSheet(items: [ProfileShareLink.url(forUsername: profile.username)]) { _ in
@@ -170,6 +181,26 @@ struct UserProfileView: View {
         .navigationDestination(item: $mentionProfileUserID) { userID in
             UserProfileView(userID: userID, session: session, container: container)
         }
+        .navigationDestination(item: $chatConversation) { conversation in
+            ChatView(
+                viewModel: ChatViewModel(
+                    conversation: conversation,
+                    useCase: container.directUseCase,
+                    realtime: container.realtimeClient,
+                    repository: container.directRepository,
+                    currentUserID: session.user.id,
+                    postUseCase: container.postUseCase
+                ),
+                shareDeps: DirectShareDependencies(
+                    directUseCase: container.directUseCase,
+                    userUseCase: container.userUseCase,
+                    searchUseCase: container.searchUseCase,
+                    currentUserID: session.user.id
+                ),
+                container: container,
+                session: session
+            )
+        }
         .navigationDestination(item: $shotsNavigation) { navigation in
             let posts = ViewerContentFilterPolicy.filterPosts(
                 viewModel.shotPosts,
@@ -220,7 +251,19 @@ struct UserProfileView: View {
     @ViewBuilder
     private func profileHeader(_ profile: UserProfile) -> some View {
         VStack(spacing: 16) {
-            UserAvatarView(user: profile.asUser(), size: 88)
+            UserAvatarView(
+                user: profile.asUser(),
+                size: 88,
+                showOnlineIndicator: true,
+                presenceStore: container.presenceStore
+            )
+                .onTapGesture {
+                    if let url = profile.avatarFullURL ?? profile.avatarURL {
+                        fullscreenAvatar = AvatarLightboxURL(url: url)
+                    }
+                }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Opens full-size avatar")
 
             VStack(spacing: 4) {
                 Text(profile.displayName)
@@ -333,6 +376,17 @@ struct UserProfileView: View {
             .foregroundStyle(Color(uiColor: .systemBackground))
             .disabled(viewModel.isFollowLoading)
 
+            Button {
+                Task { await openDirectChat(with: profile.id) }
+            } label: {
+                Text(isOpeningChat ? "…" : "Message")
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isOpeningChat)
+
             Button(role: .destructive) {
                 Task { await blockUser(profile.id) }
             } label: {
@@ -343,6 +397,16 @@ struct UserProfileView: View {
             }
             .buttonStyle(.bordered)
             .disabled(isBlocking)
+        }
+    }
+
+    private func openDirectChat(with userID: String) async {
+        isOpeningChat = true
+        defer { isOpeningChat = false }
+        do {
+            chatConversation = try await container.directUseCase.openDirect(with: userID)
+        } catch {
+            container.appState.showToast(error.localizedDescription, duration: 2.5)
         }
     }
 

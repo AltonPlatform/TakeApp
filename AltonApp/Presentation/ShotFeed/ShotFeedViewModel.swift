@@ -12,12 +12,15 @@ final class ShotFeedViewModel {
     var isRefreshing = false
     var isLoadingMore = false
     var errorMessage: String?
+    /// True when the server returned no next_cursor — catalog walk finished.
+    var isExhausted = false
     /// Client-side fallback when server filter is off / lagging.
     var showSensitiveContent = false
     /// Client-side age gate: hide age-gated shots when viewer is not 18+.
     var viewerIsAdult = false
     private var nextCursor: String?
     private var window = WindowedFeed<FeedItem>(windowSize: 60)
+    private let maxEmptyPageContinues = 3
     // Read from `deinit`; stored `nonisolated` is illegal on @Observable properties.
     @ObservationIgnored private nonisolated(unsafe) var memoryWarningObserver: NSObjectProtocol?
 
@@ -118,11 +121,12 @@ final class ShotFeedViewModel {
         defer { isLoading = false }
 
         do {
-            let page = try await feedUseCase.fetchShots(cursor: nil)
+            let page = try await fetchShotsPage(cursor: nil)
             window.replaceAll(page.items)
             items = window.items
             adSlots = Self.shotFeedSlots(from: page.adSlots)
             nextCursor = page.nextCursor
+            isExhausted = page.nextCursor == nil || page.nextCursor?.isEmpty == true
             currentIndex = 0
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -133,14 +137,16 @@ final class ShotFeedViewModel {
         guard !isRefreshing else { return }
         isRefreshing = true
         errorMessage = nil
+        isExhausted = false
         defer { isRefreshing = false }
 
         do {
-            let page = try await feedUseCase.fetchShots(cursor: nil)
+            let page = try await fetchShotsPage(cursor: nil)
             window.replaceAll(page.items)
             items = window.items
             adSlots = Self.shotFeedSlots(from: page.adSlots)
             nextCursor = page.nextCursor
+            isExhausted = page.nextCursor == nil || page.nextCursor?.isEmpty == true
             currentIndex = 0
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -149,7 +155,7 @@ final class ShotFeedViewModel {
 
     func loadMoreIfNeeded(for index: Int) async {
         guard index >= max(displayRows.count - 3, 0) else { return }
-        guard let nextCursor, !nextCursor.isEmpty else { return }
+        guard let nextCursor, !nextCursor.isEmpty, !isExhausted else { return }
         guard !isLoadingMore else { return }
 
         isLoadingMore = true
@@ -159,14 +165,17 @@ final class ShotFeedViewModel {
             let focusedID = focusedShotID(at: currentIndex)
             let firstID = items.first?.id
             let shotCountBefore = items.count
-            let page = try await feedUseCase.fetchShots(cursor: nextCursor)
-            let remapped = window.append(page.items, around: itemFocusIndex(forDisplayIndex: currentIndex))
+            let page = try await fetchShotsPage(cursor: nextCursor)
+            let existingIDs = Set(items.map(\.id))
+            let unique = page.items.filter { !existingIDs.contains($0.id) }
+            let remapped = window.append(unique, around: itemFocusIndex(forDisplayIndex: currentIndex))
             items = window.items
             let offsetSlots = Self.shotFeedSlots(from: page.adSlots).map {
                 FeedAdSlot(placementID: $0.placementID, position: $0.position + shotCountBefore)
             }
             adSlots.append(contentsOf: offsetSlots)
             self.nextCursor = page.nextCursor
+            isExhausted = page.nextCursor == nil || page.nextCursor?.isEmpty == true
             if items.first?.id != firstID {
                 restoreCurrentIndex(shotID: focusedID, fallbackItemIndex: remapped)
             }
@@ -175,12 +184,36 @@ final class ShotFeedViewModel {
         }
     }
 
+    /// At the end of the catalog: try one more page if a cursor remains; do not auto-refresh.
     func handleOverscrollPastEnd() async {
+        guard !isExhausted else { return }
         if let nextCursor, !nextCursor.isEmpty {
             await loadMoreIfNeeded(for: displayRows.count - 1)
-        } else {
-            await refresh()
         }
+    }
+
+    /// Fetch a page; continue through empty filtered pages while a cursor remains.
+    private func fetchShotsPage(cursor: String?) async throws -> ShotFeedPage {
+        var cursor = cursor
+        var mergedItems: [FeedItem] = []
+        var mergedAds: [FeedAdSlot] = []
+        var lastCursor: String? = cursor
+        var continues = 0
+
+        repeat {
+            let page = try await feedUseCase.fetchShots(cursor: cursor)
+            mergedItems.append(contentsOf: page.items)
+            mergedAds.append(contentsOf: page.adSlots)
+            lastCursor = page.nextCursor
+            let hasMore = page.nextCursor.map { !$0.isEmpty } ?? false
+            if !page.items.isEmpty || !hasMore {
+                break
+            }
+            continues += 1
+            cursor = page.nextCursor
+        } while continues < maxEmptyPageContinues
+
+        return ShotFeedPage(items: mergedItems, nextCursor: lastCursor, adSlots: mergedAds)
     }
 
     func setCurrentIndex(_ index: Int) {

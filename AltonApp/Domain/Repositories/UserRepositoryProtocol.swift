@@ -19,6 +19,7 @@ protocol UserRepositoryProtocol: Sendable {
     func updateInterests(_ interests: [Interest]) async throws
     func checkUsernameAvailable(_ username: String) async throws -> Bool
     func avatarUploadURL(contentType: String) async throws -> (uploadURL: URL, objectKey: String)
+    func completeAvatarUpload(objectKey: String) async throws
     func fetchTakePosts(userID: String, cursor: String?, limit: Int) async throws -> (posts: [Post], nextCursor: String?)
     func fetchShotPosts(userID: String, cursor: String?, limit: Int) async throws -> (posts: [Post], nextCursor: String?)
     func follow(userID: String) async throws -> Bool

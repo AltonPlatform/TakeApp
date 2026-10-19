@@ -14,12 +14,13 @@ final class APIEndpointTests: XCTestCase {
     }
 
     func testFeedURLBuildsCursorAndModeQuery() throws {
-        let url = try APIEndpoint.feed(cursor: "abc123", limit: 25, mode: "following").url(baseURL: baseURL)
+        let url = try APIEndpoint.feed(cursor: "abc123", limit: 25, mode: "following", postType: "shot").url(baseURL: baseURL)
         let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
         let items = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value) })
         XCTAssertEqual(items["limit"], "25")
         XCTAssertEqual(items["cursor"], "abc123")
         XCTAssertEqual(items["mode"], "following")
+        XCTAssertEqual(items["post_type"], "shot")
         XCTAssertEqual(url.path, "/v1/feed")
     }
 

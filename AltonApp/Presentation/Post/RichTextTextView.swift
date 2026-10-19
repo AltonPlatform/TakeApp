@@ -1,4 +1,5 @@
 import UIKit
+import UniformTypeIdentifiers
 
 /// Keeps the composer text view first responder while the tool bar handles a tap.
 enum RichTextFocusLock {
@@ -59,6 +60,8 @@ final class RichTextTextView: UITextView, UIGestureRecognizerDelegate {
     }
 
     var onFittedHeightChange: ((CGFloat) -> Void)?
+    /// When set, pasted images are routed here instead of inline NSTextAttachments.
+    var onPasteImages: (([UIImage]) -> Void)?
     private var lastFittedHeight: CGFloat = -1
 
     private var codeBlockCopyButtons: [UIButton] = []
@@ -123,6 +126,58 @@ final class RichTextTextView: UITextView, UIGestureRecognizerDelegate {
             return false
         }
         return super.resignFirstResponder()
+    }
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if action == #selector(paste(_:)), onPasteImages != nil {
+            return UIPasteboard.general.hasStrings
+                || ComposerPasteAttachments.pasteboardHasImages
+                || !(UIPasteboard.general.string ?? "").isEmpty
+        }
+        return super.canPerformAction(action, withSender: sender)
+    }
+
+    override func paste(_ sender: Any?) {
+        if let onPasteImages, ComposerPasteAttachments.pasteboardHasImages {
+            let images = ComposerPasteAttachments.images(from: .general)
+            if !images.isEmpty {
+                onPasteImages(images)
+                return
+            }
+        }
+        super.paste(sender)
+    }
+
+    override var pasteConfiguration: UIPasteConfiguration? {
+        get {
+            guard onPasteImages != nil else { return super.pasteConfiguration }
+            return ComposerPasteAttachments.imagePasteConfiguration
+        }
+        set {}
+    }
+
+    override func paste(itemProviders: [NSItemProvider]) {
+        guard let onPasteImages else {
+            super.paste(itemProviders: itemProviders)
+            return
+        }
+        let imageProviders = itemProviders.filter { $0.canLoadObject(ofClass: UIImage.self) }
+        let textProviders = itemProviders.filter {
+            $0.hasItemConformingToTypeIdentifier(UTType.plainText.identifier)
+                || $0.hasItemConformingToTypeIdentifier(UTType.utf8PlainText.identifier)
+        }
+        if !imageProviders.isEmpty {
+            Task { @MainActor in
+                let images = await ComposerPasteAttachments.loadImages(from: imageProviders)
+                if !images.isEmpty {
+                    onPasteImages(images)
+                }
+            }
+            return
+        }
+        if !textProviders.isEmpty {
+            super.paste(itemProviders: textProviders)
+        }
     }
 
     private func applyDisplayMode() {

@@ -120,7 +120,8 @@ final class PostEngagementController {
             textExcerpt: post.content,
             username: post.creatorUsername,
             posterURL: post.thumbnailURL ?? post.playbackURL,
-            localVideoURL: nil
+            localVideoURL: nil,
+            postID: post.id
         )
     }
 

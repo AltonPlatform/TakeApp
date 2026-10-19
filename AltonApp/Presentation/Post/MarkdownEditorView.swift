@@ -23,6 +23,8 @@ struct MarkdownEditorView: View {
     var onFormatStateChange: (RichTextFormatState) -> Void = { _ in }
     var onSelectionLengthChange: (Int) -> Void = { _ in }
     var onPlainCaretChange: (String, Int) -> Void = { _, _ in }
+    /// Pasted images become attachments (gallery strip), not inline text attachments.
+    var onPasteImages: ([UIImage]) -> Void = { _ in }
     @Binding var pendingEdit: PendingComposerEdit?
     @Binding var pendingFormatAction: PendingFormatAction?
 
@@ -50,6 +52,7 @@ struct MarkdownEditorView: View {
         onFormatStateChange: @escaping (RichTextFormatState) -> Void = { _ in },
         onSelectionLengthChange: @escaping (Int) -> Void = { _ in },
         onPlainCaretChange: @escaping (String, Int) -> Void = { _, _ in },
+        onPasteImages: @escaping ([UIImage]) -> Void = { _ in },
         pendingEdit: Binding<PendingComposerEdit?> = .constant(nil),
         pendingFormatAction: Binding<PendingFormatAction?> = .constant(nil)
     ) {
@@ -66,6 +69,7 @@ struct MarkdownEditorView: View {
         self.onFormatStateChange = onFormatStateChange
         self.onSelectionLengthChange = onSelectionLengthChange
         self.onPlainCaretChange = onPlainCaretChange
+        self.onPasteImages = onPasteImages
         _pendingEdit = pendingEdit
         _pendingFormatAction = pendingFormatAction
     }
@@ -136,6 +140,7 @@ struct MarkdownEditorView: View {
                 onFormatStateChange: onFormatStateChange,
                 onSelectionLengthChange: onSelectionLengthChange,
                 onPlainCaretChange: onPlainCaretChange,
+                onPasteImages: onPasteImages,
                 pendingEdit: $pendingEdit,
                 onHeightChange: { height in
                     guard expandsToFitContent else { return }
@@ -237,6 +242,7 @@ struct RichTextEditorView: UIViewRepresentable {
     var onFormatStateChange: (RichTextFormatState) -> Void
     var onSelectionLengthChange: (Int) -> Void
     var onPlainCaretChange: (String, Int) -> Void
+    var onPasteImages: ([UIImage]) -> Void
     @Binding var pendingEdit: PendingComposerEdit?
     var onHeightChange: (CGFloat) -> Void
     let onMarkdownChange: (String) -> Void
@@ -260,6 +266,9 @@ struct RichTextEditorView: UIViewRepresentable {
         context.coordinator.characterLimit = characterLimit
         textView.onFittedHeightChange = { [weak coordinator = context.coordinator] height in
             coordinator?.reportHeight(height)
+        }
+        textView.onPasteImages = { [weak coordinator = context.coordinator] images in
+            coordinator?.parentOnPasteImages(images)
         }
         if autoFocus {
             context.coordinator.scheduleFocus(on: textView)
@@ -297,9 +306,13 @@ struct RichTextEditorView: UIViewRepresentable {
         context.coordinator.onFormatStateChange = onFormatStateChange
         context.coordinator.onSelectionLengthChange = onSelectionLengthChange
         context.coordinator.onPlainCaretChange = onPlainCaretChange
+        context.coordinator.onPasteImages = onPasteImages
         context.coordinator.onHeightChange = onHeightChange
         textView.onFittedHeightChange = { [weak coordinator = context.coordinator] height in
             coordinator?.reportHeight(height)
+        }
+        textView.onPasteImages = { [weak coordinator = context.coordinator] images in
+            coordinator?.parentOnPasteImages(images)
         }
 
         if focusRequestID != context.coordinator.lastFocusRequestID {
@@ -353,6 +366,7 @@ struct RichTextEditorView: UIViewRepresentable {
             onFormatStateChange: onFormatStateChange,
             onSelectionLengthChange: onSelectionLengthChange,
             onPlainCaretChange: onPlainCaretChange,
+            onPasteImages: onPasteImages,
             onHeightChange: onHeightChange
         )
     }
@@ -364,6 +378,7 @@ struct RichTextEditorView: UIViewRepresentable {
         var onFormatStateChange: (RichTextFormatState) -> Void
         var onSelectionLengthChange: (Int) -> Void
         var onPlainCaretChange: (String, Int) -> Void
+        var onPasteImages: ([UIImage]) -> Void
         var onHeightChange: (CGFloat) -> Void
         var consumedEditID = 0
         /// Highest format-action id already applied; anything `<=` is a duplicate (the binding
@@ -400,6 +415,7 @@ struct RichTextEditorView: UIViewRepresentable {
             onFormatStateChange: @escaping (RichTextFormatState) -> Void,
             onSelectionLengthChange: @escaping (Int) -> Void,
             onPlainCaretChange: @escaping (String, Int) -> Void,
+            onPasteImages: @escaping ([UIImage]) -> Void,
             onHeightChange: @escaping (CGFloat) -> Void
         ) {
             _content = content
@@ -408,7 +424,12 @@ struct RichTextEditorView: UIViewRepresentable {
             self.onFormatStateChange = onFormatStateChange
             self.onSelectionLengthChange = onSelectionLengthChange
             self.onPlainCaretChange = onPlainCaretChange
+            self.onPasteImages = onPasteImages
             self.onHeightChange = onHeightChange
+        }
+
+        func parentOnPasteImages(_ images: [UIImage]) {
+            onPasteImages(images)
         }
 
         func stagePendingEdit(_ edit: PendingComposerEdit?) {

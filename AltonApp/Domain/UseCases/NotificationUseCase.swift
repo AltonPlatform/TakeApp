@@ -7,8 +7,18 @@ struct NotificationUseCase: Sendable {
         self.repository = repository
     }
 
-    func fetchNotifications(cursor: String? = nil, limit: Int = 30, windowDays: Int = 7) async throws -> NotificationPage {
-        try await repository.fetchNotifications(cursor: cursor, limit: limit, windowDays: windowDays)
+    func fetchNotifications(
+        cursor: String? = nil,
+        limit: Int = 30,
+        windowDays: Int = 7,
+        category: NotificationCategory? = nil
+    ) async throws -> NotificationPage {
+        try await repository.fetchNotifications(
+            cursor: cursor,
+            limit: limit,
+            windowDays: windowDays,
+            category: category
+        )
     }
 
     func markRead(id: String) async throws {

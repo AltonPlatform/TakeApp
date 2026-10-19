@@ -7,9 +7,14 @@ final class NotificationRepository: NotificationRepositoryProtocol, @unchecked S
         self.apiClient = apiClient
     }
 
-    func fetchNotifications(cursor: String?, limit: Int, windowDays: Int) async throws -> NotificationPage {
+    func fetchNotifications(
+        cursor: String?,
+        limit: Int,
+        windowDays: Int,
+        category: NotificationCategory?
+    ) async throws -> NotificationPage {
         let response: NotificationsResponseDTO = try await apiClient.authorizedRequest(
-            .notifications(cursor: cursor, limit: limit, window: windowDays)
+            .notifications(cursor: cursor, limit: limit, window: windowDays, category: category?.rawValue)
         )
         return NotificationPage(
             notifications: response.notifications.map { $0.toDomain() },

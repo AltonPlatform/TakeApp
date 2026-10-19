@@ -25,7 +25,13 @@ final class FeedUseCase {
         limit: Int = AppEnvironment.current.defaultFeedLimit,
         mode: FeedMode = .forYou
     ) async throws -> FeedPage {
-        let page = try await repository.fetchFeed(cursor: cursor, limit: limit, mode: mode.apiValue)
+        let page = try await repository.fetchFeed(
+            cursor: cursor,
+            limit: limit,
+            mode: mode.apiValue,
+            postType: "take"
+        )
+        // Client-side filter remains as a safety net if the server omits post_type.
         let takes = page.items.compactMap { item -> FeedTimelineItem? in
             switch item {
             case .post(let feedItem) where feedItem.post.postType == .take:
@@ -44,7 +50,12 @@ final class FeedUseCase {
         limit: Int = AppEnvironment.current.defaultFeedLimit,
         mode: FeedMode = .forYou
     ) async throws -> ShotFeedPage {
-        let page = try await repository.fetchFeed(cursor: cursor, limit: limit, mode: mode.apiValue)
+        let page = try await repository.fetchFeed(
+            cursor: cursor,
+            limit: limit,
+            mode: mode.apiValue,
+            postType: "shot"
+        )
         let shots = page.items.compactMap { item -> FeedItem? in
             if case .post(let feedItem) = item, feedItem.post.postType == .shot {
                 return feedItem

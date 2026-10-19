@@ -68,7 +68,15 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound, .badge]
+        let userInfo = notification.request.content.userInfo
+        if Self.notificationBelongsToAnotherAccount(userInfo) {
+            return []
+        }
+        if let badge = notification.request.content.badge?.intValue {
+            AppIconBadge.set(badge)
+            return [.banner, .sound, .badge]
+        }
+        return [.banner, .sound]
     }
 
     func userNotificationCenter(
@@ -76,10 +84,17 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         didReceive response: UNNotificationResponse
     ) async {
         let userInfo = response.notification.request.content.userInfo
+        if Self.notificationBelongsToAnotherAccount(userInfo) {
+            return
+        }
         if let link = userInfo["deep_link"] as? String,
            let url = URL(string: link),
            url.scheme == AppEnvironment.current.appURLScheme || url.scheme == "https" {
             PushRegistrationCenter.handleDeepLink(url)
         }
+    }
+
+    private static func notificationBelongsToAnotherAccount(_ userInfo: [AnyHashable: Any]) -> Bool {
+        AccountPushIdentity.belongsToAnotherAccount(userInfo)
     }
 }

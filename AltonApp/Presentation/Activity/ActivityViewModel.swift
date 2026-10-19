@@ -11,6 +11,8 @@ final class ActivityViewModel {
     var errorMessage: String?
     var lastRefreshedAt: Date?
 
+    let category: NotificationCategory?
+
     private var nextCursor7: String?
     private var nextCursor30: String?
     private var windowDays = 7
@@ -18,9 +20,18 @@ final class ActivityViewModel {
     private let notificationUseCase: NotificationUseCase
     private let userUseCase: UserUseCase?
 
-    init(notificationUseCase: NotificationUseCase, userUseCase: UserUseCase? = nil) {
+    init(
+        notificationUseCase: NotificationUseCase,
+        userUseCase: UserUseCase? = nil,
+        category: NotificationCategory? = nil
+    ) {
         self.notificationUseCase = notificationUseCase
         self.userUseCase = userUseCase
+        self.category = category
+    }
+
+    var navigationTitle: String {
+        category?.title ?? "Activity"
     }
 
     var recent7Days: [NotificationItem] {
@@ -49,7 +60,10 @@ final class ActivityViewModel {
             hasExhausted7 = false
             nextCursor7 = nil
             nextCursor30 = nil
-            let page = try await notificationUseCase.fetchNotifications(windowDays: 7)
+            let page = try await notificationUseCase.fetchNotifications(
+                windowDays: 7,
+                category: category
+            )
             items = page.notifications
             nextCursor7 = page.nextCursor
             unreadCount = page.unreadCount
@@ -94,7 +108,8 @@ final class ActivityViewModel {
             do {
                 let page = try await notificationUseCase.fetchNotifications(
                     cursor: cursor,
-                    windowDays: 7
+                    windowDays: 7,
+                    category: category
                 )
                 appendUnique(page.notifications)
                 nextCursor7 = page.nextCursor
@@ -129,7 +144,8 @@ final class ActivityViewModel {
             do {
                 let page = try await notificationUseCase.fetchNotifications(
                     cursor: nextCursor30,
-                    windowDays: 30
+                    windowDays: 30,
+                    category: category
                 )
                 let cutoff = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
                 let older = page.notifications.filter { ($0.createdAt ?? .distantPast) < cutoff }

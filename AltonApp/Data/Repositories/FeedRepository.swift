@@ -7,9 +7,9 @@ final class FeedRepository: FeedRepositoryProtocol, @unchecked Sendable {
         self.apiClient = apiClient
     }
 
-    func fetchFeed(cursor: String?, limit: Int, mode: String? = nil) async throws -> FeedPage {
+    func fetchFeed(cursor: String?, limit: Int, mode: String? = nil, postType: String? = nil) async throws -> FeedPage {
         let response: FeedResponseDTO = try await apiClient.authorizedRequest(
-            .feed(cursor: cursor, limit: limit, mode: mode)
+            .feed(cursor: cursor, limit: limit, mode: mode, postType: postType)
         )
         return FeedPage(
             items: response.items.compactMap { $0.toDomain() },

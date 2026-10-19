@@ -112,6 +112,9 @@ struct CreatePostView: View {
                                 onPlainCaretChange: { plain, caret in
                                     mentionPicker.update(plainText: plain, utf16Caret: caret)
                                 },
+                                onPasteImages: { images in
+                                    Task { await viewModel.appendPastedImages(images) }
+                                },
                                 pendingEdit: $pendingEdit,
                                 pendingFormatAction: $pendingFormatAction
                             )
@@ -124,6 +127,7 @@ struct CreatePostView: View {
                                     remainingSlots: remainingPickerSlots,
                                     onRemove: { viewModel.removeAttachment($0) },
                                     onEdit: { attachment in
+                                        guard !attachment.playsAsAnimation else { return }
                                         guard let image = UIImage(data: attachment.data) else { return }
                                         activeCrop = PhotoCropDraft(
                                             image: image,

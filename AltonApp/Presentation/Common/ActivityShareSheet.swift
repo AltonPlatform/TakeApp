@@ -7,31 +7,33 @@ struct PostSharePayload: Equatable, Sendable {
     let url: URL
     let textExcerpt: String?
     let username: String?
-    /// Optional poster / thumbnail used when rendering the ImageRenderer share card.
+    /// Optional poster / thumbnail used when rendering the share card.
     let posterURL: URL?
     /// Optional local H.264 file for Instagram Stories background video.
     let localVideoURL: URL?
+    /// Server post id for in-app Direct share (`POST /dm/share`).
+    let postID: String?
 
     init(
         url: URL,
         textExcerpt: String? = nil,
         username: String? = nil,
         posterURL: URL? = nil,
-        localVideoURL: URL? = nil
+        localVideoURL: URL? = nil,
+        postID: String? = nil
     ) {
         self.url = url
         self.textExcerpt = textExcerpt
         self.username = username
         self.posterURL = posterURL
         self.localVideoURL = localVideoURL
+        self.postID = postID
     }
 
     /// Share sheet message, e.g. `"Hello — @alice in Take"`.
     var shareMessage: String {
-        let excerpt = (textExcerpt ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
         let clipped: String = {
-            guard !excerpt.isEmpty else { return "" }
+            guard let excerpt = Self.meaningfulExcerpt(textExcerpt) else { return "" }
             if excerpt.count <= 120 { return excerpt }
             let idx = excerpt.index(excerpt.startIndex, offsetBy: 120)
             return String(excerpt[..<idx]).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
@@ -53,6 +55,16 @@ struct PostSharePayload: Equatable, Sendable {
             return "@\(bare) on Take"
         }
         return "Take"
+    }
+
+    /// Drops whitespace-only and punctuation-only stubs like `"."` / `"…"`.
+    static func meaningfulExcerpt(_ text: String?) -> String? {
+        guard let text else { return nil }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let junk: Set<Character> = ["!", ".", ",", "-", "–", "—", "·", "…", "•", " ", "\t", "\n"]
+        if trimmed.allSatisfy({ junk.contains($0) }) { return nil }
+        return trimmed
     }
 }
 
@@ -77,6 +89,12 @@ enum ShareChannelMapper {
     }
 }
 
+/// System share sheet fallback ("More…" in `PostShareSheet`).
+///
+/// Shares **URL-only** — like TikTok/X: destinations fetch the OG-tag preview
+/// from the link themselves. No big card image is attached, and no card is
+/// rendered (the old coordinator rendered a 1080×1920 card on the main thread
+/// in `init`).
 struct ActivityShareSheet: UIViewControllerRepresentable {
     let payload: PostSharePayload
     /// `(completed, channel)` — channel is set only when the user finished a share.
@@ -102,29 +120,11 @@ struct ActivityShareSheet: UIViewControllerRepresentable {
     }
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        let source = context.coordinator.itemSource
-        var items: [Any] = [source]
-        if let card = context.coordinator.cardImage {
-            items.append(card)
-        }
-
-        let stories = InstagramStoriesActivity(
-            backgroundImage: context.coordinator.cardImage ?? context.coordinator.posterImage,
-            stickerImage: context.coordinator.cardImage,
-            backgroundVideoURL: payload.localVideoURL
-        ) { [onComplete] in
-            onComplete(true, "instagram")
-        }
-
         let controller = UIActivityViewController(
-            activityItems: items,
-            applicationActivities: [stories]
+            activityItems: [context.coordinator.itemSource],
+            applicationActivities: []
         )
         controller.completionWithItemsHandler = { activityType, completed, _, _ in
-            // Custom Stories activity already reports completion via `onShared`.
-            if activityType == stories.activityType {
-                return
-            }
             if completed {
                 onComplete(true, ShareChannelMapper.channel(for: activityType))
             } else {
@@ -139,20 +139,9 @@ struct ActivityShareSheet: UIViewControllerRepresentable {
     @MainActor
     final class Coordinator {
         let itemSource: PostShareItemSource
-        let cardImage: UIImage?
-        let posterImage: UIImage?
 
         init(payload: PostSharePayload) {
             self.itemSource = PostShareItemSource(payload: payload)
-            // Only load local file posters synchronously; remote thumbs use gradient card.
-            var poster: UIImage?
-            if let posterURL = payload.posterURL, posterURL.isFileURL,
-               let data = try? Data(contentsOf: posterURL),
-               let image = UIImage(data: data) {
-                poster = image
-            }
-            self.posterImage = poster
-            self.cardImage = PostShareCardRenderer.render(payload: payload, posterImage: poster)
         }
     }
 }

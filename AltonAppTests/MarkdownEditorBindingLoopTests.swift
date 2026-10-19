@@ -16,6 +16,7 @@ final class MarkdownEditorBindingLoopTests: XCTestCase {
             onFormatStateChange: { _ in },
             onSelectionLengthChange: { _ in },
             onPlainCaretChange: { _, _ in },
+            onPasteImages: { _ in },
             onHeightChange: { _ in }
         )
         let textView = RichTextTextView()

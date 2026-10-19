@@ -1,4 +1,6 @@
 import SwiftUI
+import UIKit
+import Nuke
 import NukeUI
 
 /// Compact horizontal thumbnails for the take composer (not the feed-sized carousel).
@@ -674,6 +676,8 @@ struct ImageLightboxView: View {
     var thumbnailURLs: [URL] = []
     var blurFlags: [Bool]? = nil
     var unknownFlags: [Bool]? = nil
+    /// When set, overrides URL-extension detection (e.g. DM `kind == gif`).
+    var animatedFlags: [Bool]? = nil
     let initialIndex: Int
 
     @State private var pageIndex: Int
@@ -686,12 +690,14 @@ struct ImageLightboxView: View {
         thumbnailURLs: [URL] = [],
         blurFlags: [Bool]? = nil,
         unknownFlags: [Bool]? = nil,
+        animatedFlags: [Bool]? = nil,
         initialIndex: Int
     ) {
         self.urls = urls
         self.thumbnailURLs = thumbnailURLs
         self.blurFlags = blurFlags
         self.unknownFlags = unknownFlags
+        self.animatedFlags = animatedFlags
         self.initialIndex = initialIndex
         _pageIndex = State(initialValue: initialIndex)
     }
@@ -702,6 +708,7 @@ struct ImageLightboxView: View {
 
     var body: some View {
         GeometryReader { geo in
+            let topInset = max(geo.safeAreaInsets.top, 54)
             ZStack {
                 Color.black
                     .opacity(dismissDrag.backgroundOpacity)
@@ -717,6 +724,7 @@ struct ImageLightboxView: View {
                             url: item.url,
                             thumbnailURL: thumbnailURLs.indices.contains(item.index) ? thumbnailURLs[item.index] : nil,
                             isCurrentPage: pageIndex == item.index,
+                            forceAnimated: animatedFlags?[item.index],
                             onZoomChange: { zoomed in
                                 if zoomed {
                                     zoomedPageIndex = item.index
@@ -734,17 +742,38 @@ struct ImageLightboxView: View {
                 .scaleEffect(dismissDrag.scale)
                 .clipShape(RoundedRectangle(cornerRadius: dismissDrag.cornerRadius, style: .continuous))
 
-                VStack {
-                    HStack {
-                        Spacer()
-                        closeButton
+                // Same top-trailing close chrome as take immersive viewer.
+                ZStack(alignment: .topTrailing) {
+                    LinearGradient(
+                        colors: [.black.opacity(0.45), .clear],
+                        startPoint: .top,
+                        endPoint: .center
+                    )
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+
+                    Button {
+                        closeAnimated()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title)
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, .white.opacity(0.25))
                     }
-                    Spacer()
+                    .accessibilityLabel("Close")
+                    .padding(.trailing, 16)
+                    .padding(.top, topInset)
+
                     if urls.count > 1 {
-                        pageCounter
-                            .padding(.bottom, 28)
+                        VStack {
+                            Spacer()
+                            pageCounter
+                                .padding(.bottom, 28)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
                 }
+                .zIndex(2)
                 .opacity(dismissDrag.chromeOpacity)
                 .allowsHitTesting(!dismissDrag.isDismissing && dismissDrag.progress < 0.2)
             }
@@ -762,19 +791,6 @@ struct ImageLightboxView: View {
         .onChange(of: pageIndex) { _, _ in
             zoomedPageIndex = nil
         }
-    }
-
-    private var closeButton: some View {
-        Button {
-            closeAnimated()
-        } label: {
-            Image(systemName: "xmark.circle.fill")
-                .font(.title)
-                .symbolRenderingMode(.palette)
-                .foregroundStyle(.white, .white.opacity(0.25))
-        }
-        .accessibilityLabel("Close")
-        .padding()
     }
 
     private var pageCounter: some View {
@@ -946,21 +962,22 @@ struct ImageImmersiveViewer: View {
         .onChange(of: pageIndex) { _, _ in
             zoomedPageIndex = nil
         }
-        .sheet(isPresented: $showShareSheet) {
-            if let payload = engagementController.makeSharePayload(for: post) {
-                ActivityShareSheet(payload: payload) { completed, channel in
-                    showShareSheet = false
-                    if completed, let channel {
-                        Task {
-                            post = await engagementController.completeShare(
-                                post: post,
-                                channel: channel
-                            )
-                            onPostChange(post)
-                        }
-                    }
+        .postShareSheet(
+            isPresented: $showShareSheet,
+            payload: engagementController.makeSharePayload(for: post),
+            preferSheet: true
+        ) { completed, channel in
+            showShareSheet = false
+            // Nested cover can leave swipe-dismiss chrome stuck translucent.
+            dismissDrag = LightboxDismissDrag()
+            if completed, let channel {
+                Task {
+                    post = await engagementController.completeShare(
+                        post: post,
+                        channel: channel
+                    )
+                    onPostChange(post)
                 }
-                .presentationDetents([.medium, .large])
             }
         }
     }
@@ -1112,6 +1129,8 @@ private struct ZoomableRemoteImage: View {
     var thumbnailURL: URL? = nil
     let isCurrentPage: Bool
     var doubleTapZooms: Bool = true
+    /// `true`/`false` forces animated decoding; `nil` falls back to URL heuristics.
+    var forceAnimated: Bool? = nil
     var onZoomChange: (Bool) -> Void
     var onDoubleTap: (() -> Void)?
 
@@ -1121,13 +1140,17 @@ private struct ZoomableRemoteImage: View {
     @State private var imageAspect: CGFloat?
 
     private var placeholderURL: URL? {
-        guard let thumbnailURL, thumbnailURL != url else { return nil }
+        // Never use a still thumb as the LazyImage source for animated media.
+        guard !isAnimated, let thumbnailURL, thumbnailURL != url else { return nil }
         return thumbnailURL
     }
 
     private var isAnimated: Bool {
+        if let forceAnimated { return forceAnimated }
         let ext = url.pathExtension.lowercased()
-        return ext == "gif" || ext == "webp"
+        if ext == "gif" || ext == "webp" { return true }
+        // Catalog GIFs live under `/gifs/{id}.…` even when the CDN path is unusual.
+        return url.path.contains("/gifs/")
     }
 
     var body: some View {
@@ -1144,27 +1167,35 @@ private struct ZoomableRemoteImage: View {
         }
     }
 
+    @ViewBuilder
     private var imageStack: some View {
-        ZStack {
-            if let placeholderURL, !isAnimated {
-                LazyImage(url: placeholderURL) { state in
-                    if let image = state.image, !hasFullImage {
+        if isAnimated {
+            // UIImageView keeps Nuke/ImageIO frame animation; SwiftUI scaleEffect freezes GIFs.
+            NukeAnimatedRemoteImage(url: url) { size in
+                rememberAspect(size)
+            }
+        } else {
+            ZStack {
+                if let placeholderURL {
+                    LazyImage(url: placeholderURL) { state in
+                        if let image = state.image, !hasFullImage {
+                            zoomable(image, pixelSize: state.imageContainer?.image.size)
+                        }
+                    }
+                    .processors([.resize(width: 512)])
+                }
+
+                LazyImage(url: url) { state in
+                    if let image = state.image {
                         zoomable(image, pixelSize: state.imageContainer?.image.size)
+                            .onAppear { hasFullImage = true }
+                    } else if placeholderURL == nil {
+                        ProgressView()
+                            .tint(.white)
                     }
                 }
-                .processors([.resize(width: 512)])
+                .processors([.resize(width: 1600)])
             }
-
-            LazyImage(url: url) { state in
-                if let image = state.image {
-                    zoomable(image, pixelSize: state.imageContainer?.image.size)
-                        .onAppear { hasFullImage = true }
-                } else if placeholderURL == nil || isAnimated {
-                    ProgressView()
-                        .tint(.white)
-                }
-            }
-            .processors(isAnimated ? [] : [.resize(width: 1600)])
         }
     }
 
@@ -1230,6 +1261,21 @@ private struct ZoomableRemoteImage: View {
                     onDoubleTap?()
                 }
             }
+    }
+}
+
+/// Plays animated GIF/WebP (delegates to shared ImageIO-backed player).
+private struct NukeAnimatedRemoteImage: View {
+    let url: URL
+    var onPixelSize: (CGSize?) -> Void
+
+    var body: some View {
+        AnimatedRemoteImage(
+            url: url,
+            contentMode: .scaleAspectFit,
+            maxPixelSize: 1024,
+            onPixelSize: onPixelSize
+        )
     }
 }
 

@@ -136,6 +136,20 @@ final class UserRepository: UserRepositoryProtocol, @unchecked Sendable {
         return (dto.uploadURL, dto.objectKey)
     }
 
+    func completeAvatarUpload(objectKey: String) async throws {
+        struct Body: Encodable {
+            let objectKey: String
+            enum CodingKeys: String, CodingKey { case objectKey = "object_key" }
+        }
+        struct Resp: Decodable {
+            let accepted: Bool?
+        }
+        let _: Resp = try await apiClient.authorizedRequest(
+            .avatarUploadComplete,
+            body: Body(objectKey: objectKey)
+        )
+    }
+
     func fetchTakePosts(userID: String, cursor: String?, limit: Int) async throws -> (posts: [Post], nextCursor: String?) {
         let response: UserPostsPageDTO = try await fetchCreatorPosts(
             id: userID,

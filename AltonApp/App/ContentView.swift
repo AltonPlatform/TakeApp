@@ -8,13 +8,17 @@ struct ContentView: View {
     var body: some View {
         Group {
             if container.sessionStore.isRestoringSession {
-                SessionRestoringView()
+                SessionRestoringView(message: "Restoring session…")
+            } else if container.sessionStore.isLoggingOut {
+                SessionRestoringView(message: "Signing out…")
             } else if let currentSession = container.sessionStore.session {
                 MainTabView(container: container, session: currentSession) {
                     Task {
-                        await PushRegistrationCenter.unregisterOnLogout()
+                        container.sessionStore.beginLogout()
+                        // Unregister while tokens still work, then wipe and drop the session.
+                        await container.clearUserSessionState()
                         try? await container.authUseCase.logout()
-                        container.sessionStore.session = nil
+                        container.sessionStore.completeLogout()
                     }
                 }
             } else {
@@ -27,6 +31,7 @@ struct ContentView: View {
                 }
             }
         }
+        .preferredColorScheme(.light)
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             let now = Date()
@@ -49,10 +54,12 @@ struct ContentView: View {
 }
 
 private struct SessionRestoringView: View {
+    var message: String = "Restoring session…"
+
     var body: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text("Restoring session…")
+            Text(message)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

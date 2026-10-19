@@ -21,6 +21,11 @@ final class NotificationService: UNNotificationServiceExtension {
             contentHandler(request.content)
             return
         }
+        if AccountPushIdentity.belongsToAnotherAccount(working.userInfo) {
+            AccountPushIdentity.redact(working)
+            contentHandler(working)
+            return
+        }
         fallbackContent = fallback
 
         processTask = Task { [weak self] in
@@ -79,12 +84,19 @@ final class NotificationService: UNNotificationServiceExtension {
         let canShowCommunication = actorID != nil && actorName != nil && !(actorName?.isEmpty ?? true)
             && (NotificationMediaPolicy.isCommunicationEvent(eventType) || eventType == nil)
         if canShowCommunication, let actorID, let actorName {
-            if let updated = await communicationContent(
-                from: content,
+            let usableAvatar = avatar.flatMap { UIImage(data: $0) != nil ? $0 : nil }
+            let senderImage = usableAvatar ?? letterAvatarData(for: actorName)
+            let conversation = conversationIdentifier(
                 eventType: eventType ?? "message",
                 actorID: actorID,
+                userInfo: userInfo
+            )
+            if let updated = await communicationContent(
+                from: content,
+                conversationIdentifier: conversation,
+                actorID: actorID,
                 actorName: actorName,
-                avatarData: avatar,
+                avatarData: senderImage,
                 attachments: attachments
             ) {
                 return updated
@@ -102,22 +114,22 @@ final class NotificationService: UNNotificationServiceExtension {
 
     private static func communicationContent(
         from content: UNMutableNotificationContent,
-        eventType: String,
+        conversationIdentifier: String,
         actorID: String,
         actorName: String,
         avatarData: Data?,
         attachments: [UNNotificationAttachment]
     ) async -> UNNotificationContent? {
         let avatarImage = intentImage(from: avatarData)
-        var nameComponents = PersonNameComponents()
-        nameComponents.nickname = actorName
         let sender = INPerson(
             personHandle: INPersonHandle(value: actorID, type: .unknown),
-            nameComponents: nameComponents,
+            nameComponents: personNameComponents(for: actorName),
             displayName: actorName,
             image: avatarImage,
             contactIdentifier: nil,
-            customIdentifier: actorID
+            customIdentifier: actorID,
+            isMe: false,
+            suggestionType: .none
         )
         // Direct incoming message: Apple adds the current user as recipient.
         // Do not pass a dummy `isMe` person — that breaks communication style.
@@ -126,7 +138,7 @@ final class NotificationService: UNNotificationServiceExtension {
             outgoingMessageType: .outgoingMessageText,
             content: content.body,
             speakableGroupName: nil,
-            conversationIdentifier: "\(eventType):\(actorID)",
+            conversationIdentifier: conversationIdentifier,
             serviceName: nil,
             sender: sender,
             attachments: nil
@@ -155,6 +167,87 @@ final class NotificationService: UNNotificationServiceExtension {
             logger.error("updating from intent failed: \(error.localizedDescription, privacy: .public)")
             return nil
         }
+    }
+
+    /// givenName drives the system monogram when the avatar image is missing.
+    private static func personNameComponents(for name: String) -> PersonNameComponents {
+        var components = PersonNameComponents()
+        let parts = name.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+        let given = parts.first.map(String.init) ?? name
+        components.givenName = given.hasPrefix("@") ? String(given.dropFirst()) : given
+        if parts.count > 1 {
+            components.familyName = String(parts[1])
+        }
+        components.nickname = name
+        return components
+    }
+
+    /// Direct messages share one thread per chat. Other events stay grouped by sender.
+    private static func conversationIdentifier(
+        eventType: String,
+        actorID: String,
+        userInfo: [AnyHashable: Any]
+    ) -> String {
+        if eventType == "dm",
+           let link = payloadString(userInfo, "deep_link"),
+           let range = link.range(of: "://dm/") {
+            let raw = link[range.upperBound...]
+            let id = (raw.split(separator: "?", maxSplits: 1).first.map(String.init) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !id.isEmpty {
+                return "dm:\(id)"
+            }
+        }
+        return "\(eventType):\(actorID)"
+    }
+
+    /// Square fill. iOS masks communication-notification avatars to a circle.
+    private static func letterAvatarData(for name: String) -> Data? {
+        let initial = NotificationMediaPolicy.avatarInitial(for: name)
+        let size: CGFloat = 128
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size), format: format)
+        let image = renderer.image { _ in
+            letterAvatarColor(for: name).setFill()
+            UIBezierPath(rect: CGRect(x: 0, y: 0, width: size, height: size)).fill()
+
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = .center
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: size * 0.46, weight: .semibold),
+                .foregroundColor: UIColor.white,
+                .paragraphStyle: paragraph,
+            ]
+            let text = initial as NSString
+            let bounds = text.boundingRect(
+                with: CGSize(width: size, height: size),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attributes,
+                context: nil
+            )
+            let rect = CGRect(x: 0, y: (size - bounds.height) / 2, width: size, height: bounds.height)
+            text.draw(in: rect, withAttributes: attributes)
+        }
+        return image.jpegData(compressionQuality: 0.9)
+    }
+
+    private static func letterAvatarColor(for name: String) -> UIColor {
+        let palette: [UIColor] = [
+            UIColor(red: 0.36, green: 0.42, blue: 0.93, alpha: 1),
+            UIColor(red: 0.18, green: 0.62, blue: 0.55, alpha: 1),
+            UIColor(red: 0.85, green: 0.42, blue: 0.31, alpha: 1),
+            UIColor(red: 0.55, green: 0.36, blue: 0.86, alpha: 1),
+            UIColor(red: 0.20, green: 0.52, blue: 0.82, alpha: 1),
+            UIColor(red: 0.78, green: 0.33, blue: 0.52, alpha: 1),
+        ]
+        var hash = 0
+        for scalar in name.unicodeScalars {
+            hash = hash &* 31 &+ Int(scalar.value)
+        }
+        let index = Int(UInt(bitPattern: hash) % UInt(palette.count))
+        return palette[index]
     }
 
     private static func intentImage(from data: Data?) -> INImage? {
