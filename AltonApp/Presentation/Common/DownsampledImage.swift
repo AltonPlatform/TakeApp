@@ -35,12 +35,25 @@ enum DownsampledImage {
         return image.jpegData(compressionQuality: compressionQuality)
     }
 
+    /// Whether ImageIO can create a WebP destination on this OS/device.
+    /// Some runtimes log `unsupported output file format 'org.webmproject.webp'` and fail.
+    static var canEncodeWebP: Bool = {
+        let probe = NSMutableData()
+        return CGImageDestinationCreateWithData(
+            probe,
+            UTType.webP.identifier as CFString,
+            1,
+            nil
+        ) != nil
+    }()
+
     /// Downsamples and encodes as lossy WebP (server can copy when ≤ max dimension).
     static func webpData(
         from data: Data,
         maxPixelSize: CGFloat,
         compressionQuality: CGFloat
     ) -> Data? {
+        guard canEncodeWebP else { return nil }
         guard let image = make(data: data, maxPixelSize: maxPixelSize),
               let cgImage = image.cgImage else { return nil }
         let out = NSMutableData()

@@ -100,20 +100,18 @@ struct FeedReplyView: View {
             .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         }
         .padding(12)
-        .sheet(isPresented: $showShareSheet) {
-            if let payload = engagementController.makeSharePayload(for: parentPost) {
-                ActivityShareSheet(payload: payload) { completed, channel in
-                    showShareSheet = false
-                    if completed, let channel {
-                        Task {
-                            _ = await engagementController.completeShare(
-                                post: parentPost,
-                                channel: channel
-                            )
-                        }
-                    }
+        .postShareSheet(
+            isPresented: $showShareSheet,
+            payload: engagementController.makeSharePayload(for: parentPost)
+        ) { completed, channel in
+            showShareSheet = false
+            if completed, let channel {
+                Task {
+                    _ = await engagementController.completeShare(
+                        post: parentPost,
+                        channel: channel
+                    )
                 }
-                .presentationDetents([.medium, .large])
             }
         }
     }

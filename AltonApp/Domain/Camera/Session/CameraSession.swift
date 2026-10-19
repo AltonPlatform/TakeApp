@@ -25,10 +25,19 @@ final class CameraSession: NSObject, @unchecked Sendable {
     private(set) var isConfigured = false
     private(set) var isAudioCaptureEnabled = false
     private(set) var quality: VideoQuality = .hd1080p30
+    /// When true, installs Camera Control system zoom/exposure sliders (DM camera only).
+    var installsSystemControls = false
+    private(set) var photoProfile: CameraPhotoProfile = .shot
     private var lifecycleMonitor: CaptureLifecycleMonitor?
+    private var systemControlsInstalled = false
 
     var zoomStops: [ZoomStop] { deviceManager.zoomStops }
     var zoomFactor: CGFloat { deviceManager.zoomFactor }
+    var displayZoomMultiplier: CGFloat { deviceManager.displayZoomMultiplier }
+    var primaryZoomFactor: CGFloat { deviceManager.primaryZoomFactor }
+    var minExposureBias: Float { deviceManager.minExposureBias }
+    var maxExposureBias: Float { deviceManager.maxExposureBias }
+    var currentExposureBias: Float { deviceManager.currentExposureBias }
     var cameraPosition: AVCaptureDevice.Position { deviceManager.position }
     var hasFlash: Bool { deviceManager.hasFlash }
     var hasTorch: Bool { deviceManager.hasTorch }
@@ -42,14 +51,23 @@ final class CameraSession: NSObject, @unchecked Sendable {
         frameProcessor.bindVideoCaptureProcessor(videoCaptureProcessor)
     }
 
-    func configure(enableMicrophone: Bool) async throws {
+    func configure(
+        enableMicrophone: Bool,
+        photoProfile: CameraPhotoProfile = .shot,
+        installsSystemControls: Bool = false
+    ) async throws {
         let access = await DevicePermissions.requestCaptureAccess(includeMicrophone: enableMicrophone)
         guard access.camera else {
             throw CaptureError.permissionDenied(.camera)
         }
 
         try await runOnSessionQueue {
+            self.installsSystemControls = installsSystemControls
+            self.photoProfile = photoProfile
             if self.isConfigured {
+                self.photoCaptureProcessor.applyProfile(photoProfile)
+                self.photoCaptureProcessor.applyDirectPhotoDimensions(from: self.deviceManager.currentDevice)
+                self.installSystemControlsIfNeededLocked()
                 if !self.captureSession.isRunning {
                     self.captureSession.startRunning()
                 }
@@ -135,10 +153,14 @@ final class CameraSession: NSObject, @unchecked Sendable {
                 self.videoCaptureProcessor.cancelRecording()
                 self.videoOutput.setSampleBufferDelegate(nil, queue: nil)
                 self.audioOutput.setSampleBufferDelegate(nil, queue: nil)
+                // Drop the monitor before stopRunning. Otherwise interruptionEnded
+                // starts this session again while the gallery tile is opening.
+                self.lifecycleMonitor?.automaticSessionControlEnabled = false
+                self.lifecycleMonitor = nil
+                self.removeSystemControlsLocked()
                 if self.captureSession.isRunning {
                     self.captureSession.stopRunning()
                 }
-                self.lifecycleMonitor = nil
                 self.isConfigured = false
                 self.isAudioCaptureEnabled = false
                 self.videoOutputQueue.async {
@@ -182,9 +204,16 @@ final class CameraSession: NSObject, @unchecked Sendable {
         }
     }
 
-    func setZoomFactor(_ factor: CGFloat) {
+    func setZoomFactor(_ factor: CGFloat, rampRate: Float = 8.0) {
         sessionQueue.async {
-            try? self.deviceManager.setZoomFactor(factor)
+            try? self.deviceManager.setZoomFactor(factor, rampRate: rampRate)
+        }
+    }
+
+    /// Applies zoom on the session queue before the next preview frame. No ramp.
+    func setZoomFactorNow(_ factor: CGFloat) async {
+        await runOnSessionQueueVoid {
+            try? self.deviceManager.setZoomFactor(factor, rampRate: 0)
         }
     }
 
@@ -230,10 +259,14 @@ final class CameraSession: NSObject, @unchecked Sendable {
         }
     }
 
-    func capturePhoto(flashMode: CameraFlashMode) async throws -> URL {
+    func capturePhoto(
+        flashMode: CameraFlashMode,
+        qualityPrioritization: AVCapturePhotoOutput.QualityPrioritization? = nil
+    ) async throws -> URL {
         try await photoCaptureProcessor.capture(
             flashMode: flashMode,
-            mirrored: deviceManager.position == .front
+            mirrored: deviceManager.position == .front,
+            qualityPrioritization: qualityPrioritization
         )
     }
 
@@ -347,6 +380,10 @@ final class CameraSession: NSObject, @unchecked Sendable {
         }
 
         try replaceVideoInput(position: .back)
+        // DM stills should open on the same 1× lens as the system Camera, not ultra-wide.
+        if photoProfile == .direct {
+            try? deviceManager.setZoomFactor(deviceManager.primaryZoomFactor, rampRate: 0)
+        }
 
         if enableMicrophone {
             configureAudioInput()
@@ -375,9 +412,46 @@ final class CameraSession: NSObject, @unchecked Sendable {
             }
         }
 
-        try photoCaptureProcessor.configure(session: captureSession)
+        try photoCaptureProcessor.configure(session: captureSession, profile: photoProfile)
+        photoCaptureProcessor.applyDirectPhotoDimensions(from: deviceManager.currentDevice)
         updateConnections()
+        installSystemControlsIfNeededLocked()
         deviceManager.scheduleAutoExposureAndWhiteBalanceLock()
+    }
+
+    private func removeSystemControlsLocked() {
+        guard systemControlsInstalled else { return }
+        guard #available(iOS 18.0, *), captureSession.supportsControls else {
+            systemControlsInstalled = false
+            return
+        }
+        captureSession.beginConfiguration()
+        for control in captureSession.controls {
+            captureSession.removeControl(control)
+        }
+        captureSession.commitConfiguration()
+        systemControlsInstalled = false
+    }
+
+    private func installSystemControlsIfNeededLocked() {
+        guard installsSystemControls, !systemControlsInstalled else { return }
+        guard #available(iOS 18.0, *), captureSession.supportsControls else { return }
+        guard let device = deviceManager.currentDevice else { return }
+        captureSession.beginConfiguration()
+        defer { captureSession.commitConfiguration() }
+        let zoom = AVCaptureSystemZoomSlider(device: device) { [weak self] factor in
+            self?.setZoomFactor(factor)
+        }
+        if captureSession.canAddControl(zoom) {
+            captureSession.addControl(zoom)
+        }
+        let exposure = AVCaptureSystemExposureBiasSlider(device: device) { [weak self] bias in
+            self?.setExposureBias(bias)
+        }
+        if captureSession.canAddControl(exposure) {
+            captureSession.addControl(exposure)
+        }
+        systemControlsInstalled = true
     }
 
     private func replaceVideoInput(position: AVCaptureDevice.Position) throws {

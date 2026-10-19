@@ -67,7 +67,7 @@ struct ActivityView: View {
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("Activity")
+        .navigationTitle(viewModel.navigationTitle)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             if viewModel.unreadCount > 0 {

@@ -214,6 +214,7 @@ struct FocusIndicatorView: View {
 struct CameraZoomRailView: View {
     let stops: [ZoomStop]
     let selectedFactor: CGFloat
+    var liveLabel: String? = nil
     let onSelect: (CGFloat) -> Void
 
     var body: some View {
@@ -222,7 +223,7 @@ struct CameraZoomRailView: View {
                 Button {
                     onSelect(stop.factor)
                 } label: {
-                    Text(stop.label)
+                    Text(label(for: stop))
                         .font(.system(size: 13, weight: isSelected(stop) ? .semibold : .medium))
                         .foregroundStyle(isSelected(stop) ? CameraChrome.accent : .white)
                         .frame(minWidth: 44, minHeight: 44)
@@ -243,7 +244,21 @@ struct CameraZoomRailView: View {
     }
 
     private func isSelected(_ stop: ZoomStop) -> Bool {
-        abs(selectedFactor - stop.factor) < 0.15
+        guard let nearest = nearestStop else {
+            return abs(selectedFactor - stop.factor) < 0.15
+        }
+        return nearest.id == stop.id
+    }
+
+    private var nearestStop: ZoomStop? {
+        stops.min(by: { abs($0.factor - selectedFactor) < abs($1.factor - selectedFactor) })
+    }
+
+    private func label(for stop: ZoomStop) -> String {
+        if isSelected(stop), let liveLabel {
+            return liveLabel
+        }
+        return stop.label
     }
 }
 

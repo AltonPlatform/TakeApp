@@ -39,4 +39,28 @@ final class ShareChannelMapperTests: XCTestCase {
         XCTAssertEqual(payload.shareMessage, "Hello world — @alice in Take")
         XCTAssertEqual(payload.linkTitle, "@alice on Take")
     }
+
+    func testTelegramURLEncodesSharePayload() {
+        let shareURL = URL(string: "https://alton.social/p/01ABC")!
+        let url = PostShareChannelAvailability.telegramURL(
+            shareURL: shareURL,
+            text: "Hello — @alice in Take"
+        )
+        XCTAssertNotNil(url)
+        XCTAssertEqual(url?.scheme, "tg")
+        XCTAssertEqual(url?.host, "msg_url")
+        let components = URLComponents(url: url!, resolvingAgainstBaseURL: false)
+        let pairs: [(String, String)] = (components?.queryItems ?? []).compactMap { item in
+            guard let value = item.value else { return nil }
+            return (item.name, value)
+        }
+        let items = Dictionary(uniqueKeysWithValues: pairs)
+        XCTAssertEqual(items["url"], shareURL.absoluteString)
+        XCTAssertEqual(items["text"], "Hello — @alice in Take")
+    }
+
+    func testCopyChannelConstant() {
+        // Custom share sheet reports this channel after UIPasteboard write.
+        XCTAssertEqual(ShareChannelMapper.channel(for: .copyToPasteboard), "copy")
+    }
 }

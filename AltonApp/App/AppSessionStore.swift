@@ -15,6 +15,8 @@ final class AppSessionStore {
             let userID = session?.user.id
             CrashReporting.setUser(id: userID)
             AnalyticsReporting.setUser(id: userID)
+            AccountPushIdentity.setCurrentUserID(userID)
+            onUserChanged?(oldValue?.user.id, userID)
 
             // Skip cold-start restore noise; only track interactive auth transitions.
             guard !isRestoringSession else { return }
@@ -35,11 +37,36 @@ final class AppSessionStore {
     /// True while cold-start session restoration is in progress.
     /// Prevents a flash of the login screen before refresh completes.
     private(set) var isRestoringSession = true
+    /// True while logout is tearing down tokens and local state. Hides MainTabView.
+    private(set) var isLoggingOut = false
     /// Profile share link received before session restore completes.
     private(set) var pendingProfileUsername: String?
     private let authUseCase: AuthUseCase
     private let userUseCase: UserUseCase
     private let tokenStore: TokenStoreProtocol
+    /// Wipes DM cache / disconnects realtime. Set by `DependencyContainer` after init.
+    var onLocalSessionCleared: (() async -> Void)?
+    /// Runs synchronously when the signed-in user id changes, before SwiftUI redraws.
+    var onUserChanged: ((_ previousUserID: String?, _ newUserID: String?) -> Void)?
+    static let currentUserIDKey = AccountPushIdentity.currentUserIDKey
+
+    /// Drops the push recipient check before logout finishes. `session = nil` clears it again.
+    func clearCurrentUserID() {
+        AccountPushIdentity.setCurrentUserID(nil)
+    }
+
+    /// Leaves the signed-in UI immediately while unregister and wipe finish.
+    func beginLogout() {
+        isLoggingOut = true
+        clearCurrentUserID()
+    }
+
+    func completeLogout() {
+        session = nil
+        isLoggingOut = false
+        AgeGateConfirmationStore.shared.reset()
+        SensitiveRevealSessionStore.shared.reset()
+    }
 
     init(
         authUseCase: AuthUseCase,
@@ -51,11 +78,26 @@ final class AppSessionStore {
         self.userUseCase = userUseCase
         self.tokenStore = tokenStore
         self.isRestoringSession = hasStoredCredentials
+        // Seed push filter before async restore so cold-start notifications are not
+        // fail-closed as "another account" while keychain already has a user id.
+        if hasStoredCredentials {
+            seedCurrentUserIDFromTokenStore()
+        }
+    }
+
+    /// Writes `AuthTokens.userID` into App Group / defaults for push recipient checks.
+    private func seedCurrentUserIDFromTokenStore() {
+        guard AccountPushIdentity.currentUserID() == nil,
+              let userID = try? tokenStore.load()?.userID,
+              !userID.isEmpty
+        else { return }
+        AccountPushIdentity.setCurrentUserID(userID)
     }
 
     func restoreSession() async {
         defer { isRestoringSession = false }
 
+        seedCurrentUserIDFromTokenStore()
         let previousUser = session?.user
         do {
             session = try await authUseCase.restoreSession(preserving: previousUser)
@@ -66,6 +108,8 @@ final class AppSessionStore {
             if NetworkErrorClassifier.isAuthFailure(error) {
                 try? await authUseCase.logout()
                 session = nil
+                // Cold start: session was already nil, so UI onChange will not run.
+                await onLocalSessionCleared?()
             } else {
                 session = await authUseCase.currentSession(preserving: previousUser)
             }
@@ -73,9 +117,14 @@ final class AppSessionStore {
     }
 
     func invalidateSession() {
+        isLoggingOut = false
+        clearCurrentUserID()
         session = nil
         AgeGateConfirmationStore.shared.reset()
         SensitiveRevealSessionStore.shared.reset()
+        // Local wipe/disconnect: callers that already had a session rely on
+        // ContentView.onChange / DependencyContainer.configureAuth; cold-start
+        // auth failure uses `onLocalSessionCleared` from `restoreSession`.
     }
 
     /// Updates the in-memory user and persists username on stored tokens after profile edits.
@@ -106,6 +155,7 @@ final class AppSessionStore {
             if NetworkErrorClassifier.isAuthFailure(error) {
                 try? await authUseCase.logout()
                 session = nil
+                await onLocalSessionCleared?()
             }
         }
     }

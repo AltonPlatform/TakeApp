@@ -61,6 +61,10 @@ struct UserUseCase: Sendable {
         try await repository.avatarUploadURL(contentType: contentType)
     }
 
+    func completeAvatarUpload(objectKey: String) async throws {
+        try await repository.completeAvatarUpload(objectKey: objectKey)
+    }
+
     func loadTakePosts(userID: String, cursor: String?, limit: Int = 20) async throws -> (posts: [Post], nextCursor: String?) {
         try await repository.fetchTakePosts(userID: userID, cursor: cursor, limit: limit)
     }

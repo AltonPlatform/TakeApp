@@ -10,8 +10,15 @@ final class NotificationMediaPolicyTests: XCTestCase {
         XCTAssertTrue(NotificationMediaPolicy.isCommunicationEvent("follow"))
         XCTAssertTrue(NotificationMediaPolicy.isCommunicationEvent("profile_view"))
         XCTAssertTrue(NotificationMediaPolicy.isCommunicationEvent("repost"))
+        XCTAssertTrue(NotificationMediaPolicy.isCommunicationEvent("dm"))
         XCTAssertFalse(NotificationMediaPolicy.isCommunicationEvent(nil))
         XCTAssertFalse(NotificationMediaPolicy.isCommunicationEvent(""))
+    }
+
+    func testAvatarInitialUsesFirstLetterOrQuestionMark() {
+        XCTAssertEqual(NotificationMediaPolicy.avatarInitial(for: "Ada"), "A")
+        XCTAssertEqual(NotificationMediaPolicy.avatarInitial(for: "@mina"), "M")
+        XCTAssertEqual(NotificationMediaPolicy.avatarInitial(for: "  "), "?")
     }
 
     func testDownloadAllowlistAcceptsTrustedMediaAndLoopback() {

@@ -9,7 +9,7 @@ struct MainTabView: View {
 
     @State private var takesViewModel: TakesFeedViewModel?
     @State private var shotsViewModel: ShotFeedViewModel?
-    @State private var activityViewModel: ActivityViewModel?
+    @State private var inboxHomeViewModel: InboxHomeViewModel?
     @State private var createPostViewModel: CreatePostViewModel?
     @State private var selectedTab: AppTab = .takes
     @State private var previousTab: AppTab = .takes
@@ -70,25 +70,26 @@ struct MainTabView: View {
                 }
             }
 
-            Tab("Create", systemImage: "plus.circle.fill", value: AppTab.create) {
+            // Plain `plus` — `plus.circle.fill` stacks a second ring on the liquid-glass tab chrome.
+            Tab("Create", systemImage: "plus", value: AppTab.create) {
                 Color.clear
             }
 
-            Tab("Activity", systemImage: "bell.fill", value: AppTab.activity) {
-                NavigationStack {
-                    if let activityViewModel {
-                        ActivityView(
-                            viewModel: activityViewModel,
-                            session: session,
-                            container: container
-                        )
-                    } else {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
+            Tab("Inbox", systemImage: "tray.fill", value: AppTab.inbox) {
+                if let inboxHomeViewModel {
+                    InboxView(
+                        viewModel: inboxHomeViewModel,
+                        container: container,
+                        session: session,
+                        isTabSelected: selectedTab == .inbox
+                    )
+                    .id(session.user.id)
+                } else {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .badge(activityViewModel?.unreadCount ?? 0)
+            .badge(inboxHomeViewModel?.inboxBadge ?? 0)
 
             Tab("Profile", systemImage: "person.crop.circle.fill", value: AppTab.profile) {
                 ProfileView(
@@ -107,8 +108,8 @@ struct MainTabView: View {
         .tint(.primary)
         .onChange(of: selectedTab) { _, newTab in
             ensureViewModel(for: newTab)
-            if newTab == .activity, let activityViewModel, activityViewModel.shouldAutoRefresh {
-                Task { await activityViewModel.refresh() }
+            if newTab == .inbox {
+                Task { await inboxHomeViewModel?.refreshSummaries() }
             }
             guard newTab == .create else {
                 previousTab = newTab
@@ -143,9 +144,15 @@ struct MainTabView: View {
             }
             Task {
                 await requestNotificationsIfNeeded()
-                await activityViewModel?.refreshUnreadCount()
+                ensureViewModel(for: .inbox)
+                inboxHomeViewModel?.start()
+                await inboxHomeViewModel?.refreshSummaries()
+                AppIconBadge.set(inboxHomeViewModel?.inboxBadge ?? 0)
                 await presentOnboardingIfNeeded()
             }
+        }
+        .onChange(of: inboxHomeViewModel?.inboxBadge ?? 0) { _, count in
+            AppIconBadge.set(count)
         }
         .sheet(isPresented: $showAgeGenderModal, onDismiss: {
             // Chain to interests only after a successful save (fields filled).
@@ -231,7 +238,8 @@ struct MainTabView: View {
                     initialIndex: 0,
                     session: session,
                     container: container,
-                    isOwnProfile: presentation.post.creatorID == session.user.id
+                    isOwnProfile: presentation.post.creatorID == session.user.id,
+                    showsDismissButton: true
                 )
             }
         }
@@ -317,11 +325,37 @@ struct MainTabView: View {
         .animation(.easeInOut(duration: 0.25), value: container.appState.uploadBanner)
         .animation(.easeInOut(duration: 0.25), value: container.appState.toastMessage)
         .task { await recoverShotUploads() }
+        .task {
+            await container.realtimeClient.connect()
+        }
+        .onChange(of: container.sessionStore.session?.user.id) { previousUserID, newUserID in
+            guard let previousUserID, let newUserID, previousUserID != newUserID else { return }
+            inboxHomeViewModel?.stop()
+            inboxHomeViewModel = nil
+            ensureViewModel(for: .inbox)
+            inboxHomeViewModel?.inbox.ownerUserID = newUserID
+            Task {
+                await container.realtimeClient.switchGate.wait()
+                await container.realtimeClient.connect()
+                inboxHomeViewModel?.start()
+                await inboxHomeViewModel?.refreshSummaries()
+                AppIconBadge.set(inboxHomeViewModel?.inboxBadge ?? 0)
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
-                Task { await recoverShotUploads() }
-            } else {
+                Task {
+                    await container.realtimeClient.connect()
+                    await recoverShotUploads()
+                    ensureViewModel(for: .inbox)
+                    await inboxHomeViewModel?.refreshSummaries()
+                    AppIconBadge.set(inboxHomeViewModel?.inboxBadge ?? 0)
+                }
+            } else if phase == .background {
+                Task { await container.realtimeClient.disconnect() }
                 container.postUseCase.stopAcceptedShotWatch()
+                // Persist current unread onto the SpringBoard icon while backgrounded.
+                AppIconBadge.set(inboxHomeViewModel?.inboxBadge ?? 0)
             }
         }
         .onChange(of: container.appState.takePublishGeneration) { _, _ in
@@ -428,9 +462,10 @@ struct MainTabView: View {
                 shotsViewModel?.showSensitiveContent = liveSession.user.showSensitiveContent
                 shotsViewModel?.viewerIsAdult = liveSession.user.isAdult
             }
-        case .activity:
-            if activityViewModel == nil {
-                activityViewModel = container.makeActivityViewModel()
+        case .inbox:
+            if inboxHomeViewModel == nil {
+                inboxHomeViewModel = container.makeInboxHomeViewModel()
+                inboxHomeViewModel?.inbox.ownerUserID = liveSession.user.id
             }
         case .create, .profile:
             break
@@ -559,7 +594,7 @@ private enum AppTab: Hashable {
     case takes
     case shots
     case create
-    case activity
+    case inbox
     case profile
 }
 

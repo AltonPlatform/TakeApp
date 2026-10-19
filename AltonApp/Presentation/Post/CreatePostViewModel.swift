@@ -204,6 +204,17 @@ final class CreatePostViewModel {
         }
     }
 
+    /// Clipboard paste → same attachment strip as PhotosPicker (not inline in markdown).
+    func appendPastedImages(_ images: [UIImage]) async {
+        for image in images {
+            guard attachments.count < Self.maxAttachments else {
+                errorMessage = "You can attach up to \(Self.maxAttachments) photos."
+                return
+            }
+            _ = await addAttachment(from: image, pickerItemID: nil)
+        }
+    }
+
     /// Appends a cropped (or otherwise prepared) still image from the photo editor.
     @discardableResult
     func addAttachment(from image: UIImage, pickerItemID: String?) async -> Bool {

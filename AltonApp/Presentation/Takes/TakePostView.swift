@@ -74,7 +74,9 @@ struct TakePostView: View {
                             suiWallet: nil,
                             createdAt: nil
                         ),
-                        size: 32
+                        size: 32,
+                        showOnlineIndicator: true,
+                        presenceStore: container?.presenceStore
                     )
                 }
 
@@ -163,20 +165,23 @@ struct TakePostView: View {
         .onChange(of: item.post) { _, newPost in
             post = newPost
         }
-        .sheet(isPresented: $showShareSheet) {
-            if let payload = engagementController.makeSharePayload(for: post) {
-                ActivityShareSheet(payload: payload) { completed, channel in
-                    showShareSheet = false
-                    if completed, let channel {
-                        Task {
-                            post = await engagementController.completeShare(
-                                post: post,
-                                channel: channel
-                            )
-                        }
-                    }
+        .postShareSheet(
+            isPresented: $showShareSheet,
+            payload: engagementController.makeSharePayload(for: post),
+            directShare: container.flatMap { c in
+                c.sessionStore.session.map {
+                    c.makeDirectShareDependencies(currentUserID: $0.user.id)
                 }
-                .presentationDetents([.medium, .large])
+            }
+        ) { completed, channel in
+            showShareSheet = false
+            if completed, let channel {
+                Task {
+                    post = await engagementController.completeShare(
+                        post: post,
+                        channel: channel
+                    )
+                }
             }
         }
         .sheet(isPresented: $showReportSheet) {

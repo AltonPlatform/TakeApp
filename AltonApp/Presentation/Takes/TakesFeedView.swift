@@ -198,6 +198,12 @@ struct TakesFeedView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding()
+                } else if viewModel.isExhausted && !viewModel.items.isEmpty {
+                    Text("You've seen everything")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
                 }
             }
         }

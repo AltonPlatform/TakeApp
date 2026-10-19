@@ -13,6 +13,10 @@ enum PhotoCropAspect: String, CaseIterable, Identifiable, Hashable {
     case portrait
     case landscape
     case story
+    /// DM max tall crop (1:3).
+    case dmMaxPortrait
+    /// DM max wide crop (3:1).
+    case dmMaxLandscape
 
     var id: String { rawValue }
 
@@ -24,6 +28,8 @@ enum PhotoCropAspect: String, CaseIterable, Identifiable, Hashable {
         case .portrait: return "4:5"
         case .landscape: return "16:9"
         case .story: return "9:16"
+        case .dmMaxPortrait: return "1:3"
+        case .dmMaxLandscape: return "3:1"
         }
     }
 
@@ -34,7 +40,14 @@ enum PhotoCropAspect: String, CaseIterable, Identifiable, Hashable {
         case .portrait: return 4.0 / 5.0
         case .landscape: return 16.0 / 9.0
         case .story: return 9.0 / 16.0
+        case .dmMaxPortrait: return 1.0 / 3.0
+        case .dmMaxLandscape: return 3.0
         }
+    }
+
+    /// Aspects shown in the editor picker (DM extremes are opt-in via `initialAspect`).
+    static var pickerCases: [PhotoCropAspect] {
+        [.free, .original, .square, .portrait, .landscape, .story]
     }
 }
 
@@ -344,10 +357,18 @@ struct PhotoCropEditorView: View {
         }
     }
 
+    private var aspectPickerOptions: [PhotoCropAspect] {
+        var options = PhotoCropAspect.pickerCases
+        if !options.contains(aspect) {
+            options.insert(aspect, at: 0)
+        }
+        return options
+    }
+
     private var aspectPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(PhotoCropAspect.allCases) { option in
+                ForEach(aspectPickerOptions) { option in
                     let selected = aspect == option
                     Button {
                         UISelectionFeedbackGenerator().selectionChanged()
@@ -641,7 +662,8 @@ struct PhotoCropEditorView: View {
         }
         let adjusted = PhotoEditRenderer.apply(
             to: baseImage,
-            adjustments: export?.adjustments ?? adjustments
+            adjustments: export?.adjustments ?? adjustments,
+            maxPixelSize: 2048
         )
         let cropSize = viewportSize == .zero
             ? CGSize(width: 1080, height: 1080)
@@ -969,7 +991,8 @@ private struct PhotoCropInteractiveCanvas: UIViewRepresentable {
         handle.view = view
         context.coordinator.bind(scale: $scale, offset: $offset)
         context.coordinator.appliedLookRevision = lookRevision
-        view.onCommit = { [coordinator = context.coordinator] nextScale, nextOffset in
+        view.onCommit = { [weak view, coordinator = context.coordinator] nextScale, nextOffset in
+            guard view?.window != nil else { return }
             coordinator.commit(scale: nextScale, offset: nextOffset)
         }
         view.setCropSize(cropSize)
@@ -982,7 +1005,8 @@ private struct PhotoCropInteractiveCanvas: UIViewRepresentable {
     func updateUIView(_ view: PhotoCropCanvasUIView, context: Context) {
         handle.view = view
         context.coordinator.bind(scale: $scale, offset: $offset)
-        view.onCommit = { [coordinator = context.coordinator] nextScale, nextOffset in
+        view.onCommit = { [weak view, coordinator = context.coordinator] nextScale, nextOffset in
+            guard view?.window != nil else { return }
             coordinator.commit(scale: nextScale, offset: nextOffset)
         }
         view.setCropSize(cropSize)
@@ -1029,8 +1053,8 @@ private final class PhotoCropCanvasUIView: UIView, UIGestureRecognizerDelegate {
     private var sourceImage: UIImage?
     private var sourceImageSize: CGSize = .zero
     private var cropSize: CGSize = .zero
-    private var sourceCIImage: CIImage?
-    private var displayCIImage: CIImage?
+    /// Downscaled CPU bitmap for Adjust sliders (no Core Image / Metal).
+    private var previewCGImage: CGImage?
     private var displayImageScale: CGFloat = 3
     private var adjustments = PhotoAdjustments()
     private var straighten: CGFloat = 0
@@ -1082,7 +1106,7 @@ private final class PhotoCropCanvasUIView: UIView, UIGestureRecognizerDelegate {
             || abs(lastLayoutSize.height - bounds.height) > 2
         if sizeChanged, bounds.width > 1, bounds.height > 1 {
             lastLayoutSize = bounds.size
-            rebuildDisplayCI()
+            rebuildPreviewBitmap()
             renderLook()
             clampInPlace()
             applyTransform()
@@ -1107,7 +1131,7 @@ private final class PhotoCropCanvasUIView: UIView, UIGestureRecognizerDelegate {
         let delta = abs(cropSize.width - size.width) + abs(cropSize.height - size.height)
         guard delta > 0.5 else { return }
         cropSize = size
-        rebuildDisplayCI()
+        rebuildPreviewBitmap()
         layoutImageView()
         clampInPlace()
         applyTransform()
@@ -1115,10 +1139,12 @@ private final class PhotoCropCanvasUIView: UIView, UIGestureRecognizerDelegate {
 
     func setSource(_ image: UIImage) {
         guard sourceImage !== image else { return }
-        sourceImage = image
-        sourceImageSize = image.size
-        sourceCIImage = CIImage(image: image)
-        rebuildDisplayCI()
+        let bitmap = image.photoCropBitmapImage()
+        sourceImage = bitmap
+        sourceImageSize = bitmap.size
+        // Show pixels immediately so a failed/slow filter path never leaves a black frame.
+        imageView.image = bitmap
+        rebuildPreviewBitmap()
         layoutImageView()
         renderLook()
         clampInPlace()
@@ -1354,24 +1380,47 @@ private final class PhotoCropCanvasUIView: UIView, UIGestureRecognizerDelegate {
         imageView.transform = current
     }
 
-    private func rebuildDisplayCI() {
-        guard let sourceCIImage, activeCropSize.width > 1, activeCropSize.height > 1 else { return }
+    private func rebuildPreviewBitmap() {
+        guard let sourceImage, activeCropSize.width > 1, activeCropSize.height > 1 else { return }
         let filled = PhotoCropEditorView.aspectFillSize(sourceImageSize, into: activeCropSize)
         let screen = window?.screen.scale ?? UIScreen.main.scale
         displayImageScale = screen
         var pixel = CGSize(width: filled.width * screen, height: filled.height * screen)
         let longest = max(pixel.width, pixel.height)
-        if longest > 1400 {
-            let shrink = 1400 / longest
+        // Keep Adjust previews cheap on CPU (no Metal).
+        if longest > 720 {
+            let shrink = 720 / longest
             pixel = CGSize(width: pixel.width * shrink, height: pixel.height * shrink)
         }
-        let sx = pixel.width / max(sourceCIImage.extent.width, 1)
-        let sy = pixel.height / max(sourceCIImage.extent.height, 1)
-        displayCIImage = sourceCIImage.transformed(by: CGAffineTransform(scaleX: sx, y: sy))
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = false
+        let size = CGSize(width: max(pixel.width, 1), height: max(pixel.height, 1))
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        let preview = renderer.image { _ in
+            sourceImage.draw(in: CGRect(origin: .zero, size: size))
+        }
+        previewCGImage = preview.cgImage
     }
 
     private func renderLook() {
-        guard let displayCIImage else { return }
+        // Identity filters: keep the full bitmap (straighten is a view transform).
+        if adjustments.isIdentity {
+            if let sourceImage {
+                imageView.image = sourceImage
+            }
+            return
+        }
+        guard let previewCGImage else {
+            rebuildPreviewBitmap()
+            guard let previewCGImage else { return }
+            applyAdjustmentsAsync(previewCGImage)
+            return
+        }
+        applyAdjustmentsAsync(previewCGImage)
+    }
+
+    private func applyAdjustmentsAsync(_ preview: CGImage) {
         guard !isRenderingLook else {
             hasPendingLook = true
             return
@@ -1381,18 +1430,18 @@ private final class PhotoCropCanvasUIView: UIView, UIGestureRecognizerDelegate {
         let generation = lookGeneration
         let adjustments = self.adjustments
         let screenScale = displayImageScale
-        let ciImage = displayCIImage
+        let fallback = sourceImage
         previewQueue.async {
-            let processed = PhotoEditRenderer.processedCIImage(
-                from: ciImage,
-                adjustments: adjustments
-            )
-            let cgImage = PhotoEditRenderer.renderCGImage(processed)
+            let cgImage = PhotoEditRenderer.applyCPU(to: preview, adjustments: adjustments)
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.isRenderingLook = false
-                if generation == self.lookGeneration, let cgImage {
-                    self.imageView.image = UIImage(cgImage: cgImage, scale: screenScale, orientation: .up)
+                if generation == self.lookGeneration {
+                    if let cgImage {
+                        self.imageView.image = UIImage(cgImage: cgImage, scale: screenScale, orientation: .up)
+                    } else if let fallback {
+                        self.imageView.image = fallback
+                    }
                 }
                 if self.hasPendingLook {
                     self.hasPendingLook = false
@@ -1403,6 +1452,23 @@ private final class PhotoCropCanvasUIView: UIView, UIGestureRecognizerDelegate {
     }
 
     }
+
+private extension UIImage {
+    /// Flatten orientation / decode into a CGImage-backed bitmap CI can consume reliably.
+    func photoCropBitmapImage() -> UIImage {
+        if let cgImage, imageOrientation == .up, cgImage.width > 0, cgImage.height > 0 {
+            return self
+        }
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = scale
+        format.opaque = false
+        let size = CGSize(width: max(size.width, 1), height: max(size.height, 1))
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        return renderer.image { _ in
+            draw(in: CGRect(origin: .zero, size: size))
+        }
+    }
+}
 
 private struct TickRuler: UIViewRepresentable {
     var value: Double

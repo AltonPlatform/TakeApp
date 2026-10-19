@@ -2,7 +2,7 @@ import Foundation
 
 enum APIEndpoint {
     case refresh
-    case feed(cursor: String?, limit: Int, mode: String?)
+    case feed(cursor: String?, limit: Int, mode: String?, postType: String? = nil)
     case createPost
     case post(id: String)
     case updatePost(id: String)
@@ -43,6 +43,7 @@ enum APIEndpoint {
     case updateInterests
     case usernameAvailable(username: String)
     case avatarUploadURL
+    case avatarUploadComplete
     case userTakePosts(id: String, cursor: String?, limit: Int, legacy: Bool = false)
     case userShotPosts(id: String, cursor: String?, limit: Int, legacy: Bool = false)
     case followUser(id: String)
@@ -57,7 +58,7 @@ enum APIEndpoint {
     case searchHashtag(tag: String, cursor: String?, limit: Int)
     case registerDevice
     case unregisterDevice
-    case notifications(cursor: String?, limit: Int, window: Int)
+    case notifications(cursor: String?, limit: Int, window: Int, category: String? = nil)
     case markAllNotificationsRead
     case markNotificationRead(id: String)
     case unreadNotificationCount
@@ -81,6 +82,35 @@ enum APIEndpoint {
     case linkPreview(url: String)
     case stickerPacks
     case stickerPack(id: String)
+    case dmInbox(folder: String, cursor: String?, limit: Int)
+    case dmCreateConversation
+    case dmCreateGroup
+    case dmUpdateGroup(conversationID: String)
+    case dmAddGroupMembers(conversationID: String)
+    case dmRemoveGroupMember(conversationID: String, userID: String)
+    case dmGroupMembers(conversationID: String)
+    case dmSetGroupAdmin(conversationID: String)
+    case dmBanGroupMember(conversationID: String)
+    case dmUnbanGroupMember(conversationID: String, userID: String)
+    case dmMessages(conversationID: String, beforeSeq: Int64?, afterSeq: Int64?, limit: Int)
+    case dmSendMessage(conversationID: String)
+    case dmAttachmentUpload(conversationID: String)
+    case dmMarkRead(conversationID: String)
+    case dmAccept(conversationID: String)
+    case dmDecline(conversationID: String)
+    case dmShare
+    case dmForwardMessage(messageID: String)
+    case dmEditMessage(messageID: String)
+    case dmDeleteMessage(messageID: String)
+    case dmSetReaction(messageID: String)
+    case dmClearReaction(messageID: String)
+    case dmSetChecklistItem(messageID: String, itemID: Int)
+    case dmClearChecklistItem(messageID: String, itemID: Int)
+    case dmAppendChecklistItems(messageID: String)
+    case dmVotePoll(messageID: String)
+    case dmClosePoll(messageID: String)
+    case dmAppendPollOptions(messageID: String)
+    case presence(userIDs: [String])
 
     private static let resourceIDPattern = #"^[A-Za-z0-9_-]{1,64}$"#
 
@@ -96,7 +126,7 @@ enum APIEndpoint {
         switch self {
         case .refresh:
             return baseURL.appending(path: "auth/refresh")
-        case .feed(let cursor, let limit, let mode):
+        case .feed(let cursor, let limit, let mode, let postType):
             var components = URLComponents(url: baseURL.appending(path: "feed"), resolvingAgainstBaseURL: false)
             var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
             if let cursor, !cursor.isEmpty {
@@ -104,6 +134,9 @@ enum APIEndpoint {
             }
             if let mode, !mode.isEmpty {
                 queryItems.append(URLQueryItem(name: "mode", value: mode))
+            }
+            if let postType, !postType.isEmpty {
+                queryItems.append(URLQueryItem(name: "post_type", value: postType))
             }
             components?.queryItems = queryItems
             return try requireURL(components?.url)
@@ -226,6 +259,8 @@ enum APIEndpoint {
             return try requireURL(components?.url)
         case .avatarUploadURL:
             return baseURL.appending(path: "users/me/avatar")
+        case .avatarUploadComplete:
+            return baseURL.appending(path: "users/me/avatar/complete")
         case .userTakePosts(let id, let cursor, let limit, let legacy):
             try Self.validateResourceID(id)
             let takePath = legacy ? "users/\(id)/posts/threads" : "users/\(id)/posts/takes"
@@ -257,7 +292,7 @@ enum APIEndpoint {
             return try listURL(path: "search/hashtags/\(encoded)", cursor: cursor, limit: limit, baseURL: baseURL)
         case .registerDevice, .unregisterDevice:
             return baseURL.appending(path: "devices/register")
-        case .notifications(let cursor, let limit, let window):
+        case .notifications(let cursor, let limit, let window, let category):
             var components = URLComponents(
                 url: baseURL.appending(path: "me/notifications"),
                 resolvingAgainstBaseURL: false
@@ -268,6 +303,9 @@ enum APIEndpoint {
             ]
             if let cursor, !cursor.isEmpty {
                 queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+            }
+            if let category, !category.isEmpty {
+                queryItems.append(URLQueryItem(name: "category", value: category))
             }
             components?.queryItems = queryItems
             return try requireURL(components?.url)
@@ -349,6 +387,109 @@ enum APIEndpoint {
         case .stickerPack(let id):
             try Self.validateResourceID(id)
             return baseURL.appending(path: "stickers/packs/\(id)")
+        case .dmInbox(let folder, let cursor, let limit):
+            var components = URLComponents(
+                url: baseURL.appending(path: "dm/inbox"),
+                resolvingAgainstBaseURL: false
+            )
+            var queryItems = [
+                URLQueryItem(name: "folder", value: folder),
+                URLQueryItem(name: "limit", value: String(limit)),
+            ]
+            if let cursor, !cursor.isEmpty {
+                queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+            }
+            components?.queryItems = queryItems
+            return try requireURL(components?.url)
+        case .dmCreateConversation:
+            return baseURL.appending(path: "dm/conversations")
+        case .dmCreateGroup:
+            return baseURL.appending(path: "dm/groups")
+        case .dmUpdateGroup(let conversationID):
+            try Self.validateResourceID(conversationID)
+            return baseURL.appending(path: "dm/groups/\(conversationID)")
+        case .dmAddGroupMembers(let conversationID), .dmGroupMembers(let conversationID):
+            try Self.validateResourceID(conversationID)
+            return baseURL.appending(path: "dm/groups/\(conversationID)/members")
+        case .dmRemoveGroupMember(let conversationID, let userID):
+            try Self.validateResourceID(conversationID)
+            try Self.validateResourceID(userID)
+            return baseURL.appending(path: "dm/groups/\(conversationID)/members/\(userID)")
+        case .dmSetGroupAdmin(let conversationID):
+            try Self.validateResourceID(conversationID)
+            return baseURL.appending(path: "dm/groups/\(conversationID)/admins")
+        case .dmBanGroupMember(let conversationID):
+            try Self.validateResourceID(conversationID)
+            return baseURL.appending(path: "dm/groups/\(conversationID)/bans")
+        case .dmUnbanGroupMember(let conversationID, let userID):
+            try Self.validateResourceID(conversationID)
+            try Self.validateResourceID(userID)
+            return baseURL.appending(path: "dm/groups/\(conversationID)/bans/\(userID)")
+        case .dmMessages(let conversationID, let beforeSeq, let afterSeq, let limit):
+            try Self.validateResourceID(conversationID)
+            var components = URLComponents(
+                url: baseURL.appending(path: "dm/conversations/\(conversationID)/messages"),
+                resolvingAgainstBaseURL: false
+            )
+            var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+            if let beforeSeq {
+                queryItems.append(URLQueryItem(name: "before_seq", value: String(beforeSeq)))
+            }
+            if let afterSeq {
+                queryItems.append(URLQueryItem(name: "after_seq", value: String(afterSeq)))
+            }
+            components?.queryItems = queryItems
+            return try requireURL(components?.url)
+        case .dmSendMessage(let conversationID):
+            try Self.validateResourceID(conversationID)
+            return baseURL.appending(path: "dm/conversations/\(conversationID)/messages")
+        case .dmAttachmentUpload(let conversationID):
+            try Self.validateResourceID(conversationID)
+            return baseURL.appending(path: "dm/conversations/\(conversationID)/attachments")
+        case .dmMarkRead(let conversationID):
+            try Self.validateResourceID(conversationID)
+            return baseURL.appending(path: "dm/conversations/\(conversationID)/read")
+        case .dmAccept(let conversationID):
+            try Self.validateResourceID(conversationID)
+            return baseURL.appending(path: "dm/conversations/\(conversationID)/accept")
+        case .dmDecline(let conversationID):
+            try Self.validateResourceID(conversationID)
+            return baseURL.appending(path: "dm/conversations/\(conversationID)/decline")
+        case .dmShare:
+            return baseURL.appending(path: "dm/share")
+        case .dmForwardMessage(let messageID):
+            try Self.validateResourceID(messageID)
+            return baseURL.appending(path: "dm/messages/\(messageID)/forward")
+        case .dmEditMessage(let messageID), .dmDeleteMessage(let messageID):
+            try Self.validateResourceID(messageID)
+            return baseURL.appending(path: "dm/messages/\(messageID)")
+        case .dmSetReaction(let messageID), .dmClearReaction(let messageID):
+            try Self.validateResourceID(messageID)
+            return baseURL.appending(path: "dm/messages/\(messageID)/reaction")
+        case .dmSetChecklistItem(let messageID, let itemID),
+             .dmClearChecklistItem(let messageID, let itemID):
+            try Self.validateResourceID(messageID)
+            return baseURL.appending(path: "dm/messages/\(messageID)/checklist/\(itemID)")
+        case .dmAppendChecklistItems(let messageID):
+            try Self.validateResourceID(messageID)
+            return baseURL.appending(path: "dm/messages/\(messageID)/checklist/items")
+        case .dmVotePoll(let messageID):
+            try Self.validateResourceID(messageID)
+            return baseURL.appending(path: "dm/messages/\(messageID)/poll/vote")
+        case .dmClosePoll(let messageID):
+            try Self.validateResourceID(messageID)
+            return baseURL.appending(path: "dm/messages/\(messageID)/poll/close")
+        case .dmAppendPollOptions(let messageID):
+            try Self.validateResourceID(messageID)
+            return baseURL.appending(path: "dm/messages/\(messageID)/poll/options")
+        case .presence(let userIDs):
+            var components = URLComponents(
+                url: baseURL.appending(path: "presence"),
+                resolvingAgainstBaseURL: false
+            )
+            let joined = userIDs.prefix(100).joined(separator: ",")
+            components?.queryItems = [URLQueryItem(name: "user_ids", value: joined)]
+            return try requireURL(components?.url)
         }
     }
 
@@ -398,13 +539,16 @@ enum APIEndpoint {
              .searchUsers, .searchPosts, .searchHashtag, .drafts, .scheduled, .listBlocked,
              .creatorOverview, .creatorBalance, .listPayouts, .adPlacements, .monetizationConfig,
              .getPoll, .linkPreview, .usernameAvailable, .notifications, .unreadNotificationCount,
-             .stickerPacks, .stickerPack, .reportReasons, .userInterests:
+             .stickerPacks, .stickerPack, .reportReasons, .userInterests, .dmInbox, .dmMessages,
+             .dmGroupMembers, .presence:
             return .get
-        case .updateUsername, .updateInterests:
+        case .updateUsername, .updateInterests, .dmSetReaction, .dmSetChecklistItem, .dmVotePoll:
             return .put
-        case .updateProfile, .updatePost:
+        case .updateProfile, .updatePost, .dmEditMessage, .dmUpdateGroup:
             return .patch
-        case .deleteComment, .unfollowUser, .deletePost, .unblockUser, .unregisterDevice:
+        case .deleteComment, .unfollowUser, .deletePost, .unblockUser, .unregisterDevice,
+             .dmDeleteMessage, .dmClearReaction, .dmClearChecklistItem, .dmRemoveGroupMember,
+             .dmUnbanGroupMember:
             return .delete
         default:
             return .post

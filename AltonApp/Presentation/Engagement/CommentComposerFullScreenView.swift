@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import Nuke
 import NukeUI
 
 struct CommentComposerFullScreenView: View {
@@ -67,7 +68,15 @@ struct CommentComposerFullScreenView: View {
                         isPreviewMode: $isPreviewMode,
                         characterLimit: 2000,
                         editorMinHeight: 240,
-                        style: .composer
+                        style: .composer,
+                        onPasteImages: { images in
+                            let loaded = ComposerPasteAttachments.attachments(
+                                from: images,
+                                remainingSlots: remainingSlots,
+                                filenamePrefix: "comment"
+                            )
+                            attachments.append(contentsOf: loaded)
+                        }
                     )
 
                     if let pendingSticker {
@@ -245,37 +254,11 @@ struct CommentStickerPickerSheet: View {
     let onSelect: (Sticker) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @State private var packs: [StickerPackSummary] = []
-    @State private var selectedPackID: String?
-    @State private var detail: StickerPackDetail?
-    @State private var isLoadingPacks = false
-    @State private var isLoadingDetail = false
-    @State private var errorMessage: String?
-    @State private var packLoadTask: Task<Void, Never>?
-
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
-
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoadingPacks && packs.isEmpty {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let errorMessage, packs.isEmpty {
-                    ContentUnavailableView(
-                        "Stickers unavailable",
-                        systemImage: "face.smiling",
-                        description: Text(errorMessage)
-                    )
-                } else if packs.isEmpty {
-                    ContentUnavailableView(
-                        "No stickers yet",
-                        systemImage: "face.smiling",
-                        description: Text("Published packs will show up here.")
-                    )
-                } else {
-                    content
-                }
+            StickerPackGridView(stickersUseCase: stickersUseCase) { sticker in
+                onSelect(sticker)
+                dismiss()
             }
             .navigationTitle("Stickers")
             .navigationBarTitleDisplayMode(.inline)
@@ -284,115 +267,8 @@ struct CommentStickerPickerSheet: View {
                     Button("Close") { dismiss() }
                 }
             }
-            .task { await loadPacks() }
-            .onChange(of: selectedPackID) { _, newID in
-                guard let newID else { return }
-                packLoadTask?.cancel()
-                packLoadTask = Task { await loadPack(id: newID) }
-            }
         }
         .presentationDetents([.medium, .large])
-        .onDisappear { packLoadTask?.cancel() }
-    }
-
-    private var content: some View {
-        VStack(spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(packs) { pack in
-                        Button {
-                            selectedPackID = pack.id
-                        } label: {
-                            Text(pack.title)
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(
-                                    selectedPackID == pack.id
-                                        ? Color.primary.opacity(0.12)
-                                        : Color.clear,
-                                    in: Capsule()
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            }
-
-            Divider()
-
-            if isLoadingDetail && detail == nil {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let detail {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 10) {
-                        ForEach(detail.stickers) { sticker in
-                            Button {
-                                onSelect(sticker)
-                                dismiss()
-                            } label: {
-                                LazyImage(url: sticker.thumbURL) { state in
-                                    if let image = state.image {
-                                        image
-                                            .resizable()
-                                            .scaledToFit()
-                                    } else {
-                                        Color.secondary.opacity(0.08)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity)
-                                .aspectRatio(1, contentMode: .fit)
-                                .padding(6)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(sticker.emojiHint ?? "Sticker")
-                        }
-                    }
-                    .padding(16)
-                }
-            } else if let errorMessage {
-                Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-    }
-
-    private func loadPacks() async {
-        guard !isLoadingPacks else { return }
-        isLoadingPacks = true
-        errorMessage = nil
-        defer { isLoadingPacks = false }
-        do {
-            let loaded = try await stickersUseCase.fetchPacks()
-            packs = loaded
-            if selectedPackID == nil {
-                selectedPackID = loaded.first?.id
-            }
-        } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        }
-    }
-
-    private func loadPack(id: String) async {
-        isLoadingDetail = true
-        errorMessage = nil
-        defer { isLoadingDetail = false }
-        do {
-            let loaded = try await stickersUseCase.fetchPack(id: id)
-            if Task.isCancelled { return }
-            detail = loaded
-        } catch is CancellationError {
-            return
-        } catch {
-            if Task.isCancelled { return }
-            detail = nil
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        }
     }
 }
 
@@ -433,15 +309,14 @@ struct PendingGIFChip: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            LazyImage(url: gif.previewURL) { state in
-                if let image = state.image {
-                    image.resizable().scaledToFit()
-                } else {
-                    Color.secondary.opacity(0.08)
-                }
-            }
+            AnimatedRemoteImage(
+                url: gif.previewURL,
+                contentMode: .scaleAspectFit,
+                maxPixelSize: 160
+            )
             .frame(width: 56, height: 56)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             Text(gif.title.isEmpty ? "GIF" : gif.title)
                 .font(.subheadline)
@@ -504,16 +379,13 @@ struct CommentGifImageView: View {
     var maxSide: CGFloat = 220
 
     var body: some View {
-        LazyImage(url: gif.url) { state in
-            if let image = state.image {
-                image
-                    .resizable()
-                    .scaledToFit()
-            } else {
-                Color.secondary.opacity(0.08)
-            }
-        }
+        AnimatedRemoteImage(
+            url: gif.url,
+            contentMode: .scaleAspectFit,
+            maxPixelSize: max(maxSide * 2, 440)
+        )
         .frame(width: displaySize.width, height: displaySize.height)
+        .background(Color.secondary.opacity(0.08))
         .accessibilityLabel("GIF")
     }
 
@@ -533,10 +405,66 @@ struct CommentGIFPickerSheet: View {
     let onPicked: (KlipyGIF) -> Void
     @Environment(\.dismiss) private var dismiss
 
+    var body: some View {
+        NavigationStack {
+            KlipyGIFGridView { gif in
+                onPicked(gif)
+                dismiss()
+            }
+            .navigationTitle("GIF")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+@MainActor
+@Observable
+final class KlipyGIFCatalog {
+    static let shared = KlipyGIFCatalog()
+
+    private(set) var trending: [KlipyGIF] = []
+    private(set) var isLoading = false
+    private(set) var errorMessage: String?
+    private var task: Task<Void, Never>?
+
+    /// Starts trending outside the view task, so a detent change cannot cancel it
+    /// and leave the grid on "No GIFs".
+    func ensureTrending() {
+        guard trending.isEmpty, task == nil else { return }
+        isLoading = true
+        errorMessage = nil
+        task = Task {
+            defer {
+                isLoading = false
+                task = nil
+            }
+            do {
+                trending = try await KlipyClient.shared.trending()
+            } catch is CancellationError {
+                return
+            } catch {
+                if trending.isEmpty {
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+}
+
+struct KlipyGIFGridView: View {
+    let onPicked: (KlipyGIF) -> Void
+
+    @State private var catalog = KlipyGIFCatalog.shared
     @State private var query = ""
-    @State private var gifs: [KlipyGIF] = []
-    @State private var isLoading = false
-    @State private var errorMessage: String?
+    @State private var searchResults: [KlipyGIF]?
+    @State private var searchLoading = false
+    @State private var searchError: String?
     @State private var searchTask: Task<Void, Never>?
     @FocusState private var isSearchFocused: Bool
     @State private var dismissController = KeyboardDismissController()
@@ -547,30 +475,24 @@ struct CommentGIFPickerSheet: View {
     ]
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if KlipyConfig.apiKey == nil {
-                    missingKeyView
-                } else {
-                    content
-                }
-            }
-            .navigationTitle("GIF")
-            .navigationBarTitleDisplayMode(.inline)
-            .liquidGlassKeyboardDismiss(controller: dismissController)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-            }
-            .task {
-                await loadTrending()
-            }
-            .onChange(of: query) { _, newValue in
-                scheduleSearch(newValue)
+        Group {
+            if KlipyConfig.apiKey == nil {
+                missingKeyView
+            } else {
+                content
             }
         }
-        .presentationDetents([.medium, .large])
+        .liquidGlassKeyboardDismiss(controller: dismissController)
+        .onAppear {
+            catalog.ensureTrending()
+            Task { await GIFAnimateSlots.shared.noteMounted() }
+        }
+        .onDisappear {
+            searchTask?.cancel()
+        }
+        .onChange(of: query) { _, newValue in
+            scheduleSearch(newValue)
+        }
     }
 
     private var missingKeyView: some View {
@@ -608,7 +530,7 @@ struct CommentGIFPickerSheet: View {
             .padding(.top, 8)
             .padding(.bottom, 12)
 
-            if let errorMessage {
+            if let errorMessage = activeError, shownGIFs.isEmpty {
                 Text(errorMessage)
                     .font(.footnote)
                     .foregroundStyle(.red)
@@ -618,11 +540,11 @@ struct CommentGIFPickerSheet: View {
             }
 
             ScrollView {
-                if isLoading && gifs.isEmpty {
+                if isActiveLoading && shownGIFs.isEmpty {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding(.top, 40)
-                } else if gifs.isEmpty {
+                } else if shownGIFs.isEmpty {
                     ContentUnavailableView(
                         "No GIFs",
                         systemImage: "photo.on.rectangle.angled",
@@ -631,25 +553,11 @@ struct CommentGIFPickerSheet: View {
                     .padding(.top, 24)
                 } else {
                     LazyVGrid(columns: columns, spacing: 8) {
-                        ForEach(gifs) { gif in
+                        ForEach(shownGIFs) { gif in
                             Button {
                                 select(gif)
                             } label: {
-                                LazyImage(url: gif.previewURL) { state in
-                                    ZStack {
-                                        Color(.tertiarySystemFill)
-                                        if let image = state.image {
-                                            image
-                                                .resizable()
-                                                .scaledToFill()
-                                        } else if state.isLoading {
-                                            ProgressView()
-                                        }
-                                    }
-                                }
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 140)
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                KlipyGIFGridCell(gif: gif)
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(gif.title.isEmpty ? "GIF" : gif.title)
@@ -668,39 +576,245 @@ struct CommentGIFPickerSheet: View {
         }
     }
 
+    private var isSearching: Bool {
+        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var shownGIFs: [KlipyGIF] {
+        isSearching ? (searchResults ?? []) : catalog.trending
+    }
+
+    private var isActiveLoading: Bool {
+        isSearching ? searchLoading : catalog.isLoading
+    }
+
+    private var activeError: String? {
+        isSearching ? searchError : catalog.errorMessage
+    }
+
     private func scheduleSearch(_ text: String) {
         searchTask?.cancel()
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            searchResults = nil
+            searchLoading = false
+            searchError = nil
+            return
+        }
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
-            await load(query: text)
-        }
-    }
-
-    private func loadTrending() async {
-        await load(query: "")
-    }
-
-    private func load(query: String) async {
-        guard KlipyConfig.apiKey != nil else { return }
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-
-        do {
-            let results = try await KlipyClient.shared.search(query: query)
-            guard !Task.isCancelled else { return }
-            gifs = results
-        } catch is CancellationError {
-            return
-        } catch {
-            errorMessage = error.localizedDescription
+            searchLoading = true
+            searchError = nil
+            do {
+                let results = try await KlipyClient.shared.search(query: trimmed)
+                guard !Task.isCancelled else { return }
+                searchResults = results
+            } catch is CancellationError {
+                return
+            } catch {
+                if !Task.isCancelled {
+                    searchError = error.localizedDescription
+                }
+            }
+            if !Task.isCancelled {
+                searchLoading = false
+            }
         }
     }
 
     private func select(_ gif: KlipyGIF) {
         Task { await KlipyClient.shared.registerShare(slug: gif.slug) }
         onPicked(gif)
-        dismiss()
+    }
+}
+
+/// When false, grid cells stop starting and decoding animations so a tab tap is not stuck in ImageIO.
+enum GIFThumbGate {
+    private static let lock = NSLock()
+    private static var allowed = true
+
+    static var allowsDecode: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return allowed
+    }
+
+    static func setAllowed(_ value: Bool) {
+        lock.lock()
+        allowed = value
+        lock.unlock()
+    }
+}
+
+/// Caps how many grid cells hold an AVPlayer at once.
+actor GIFAnimateSlots {
+    static let shared = GIFAnimateSlots()
+
+    private let limit = 4
+    private let rampLimit = 2
+    private var rampUntil: Date?
+    private var inUse = 0
+    private var nextTicket = 0
+    private var held: Set<Int> = []
+    private var cancelledIDs: Set<UUID> = []
+    private var waiters: [(id: UUID, continuation: CheckedContinuation<Int?, Never>)] = []
+
+    /// First 600ms after the grid appears, only two players start.
+    func noteMounted() {
+        rampUntil = Date().addingTimeInterval(0.6)
+        Task {
+            try? await Task.sleep(for: .milliseconds(600))
+            await self.openRamp()
+        }
+    }
+
+    func acquire() async -> Int? {
+        let id = UUID()
+        return await withTaskCancellationHandler {
+            await beginWait(id)
+        } onCancel: {
+            Task { await self.cancelWaiter(id) }
+        }
+    }
+
+    func release(_ ticket: Int) {
+        guard held.remove(ticket) != nil else { return }
+        if inUse > 0 { inUse -= 1 }
+        resumeNext()
+    }
+
+    /// Drops cells still waiting for a player slot.
+    func stop() {
+        rampUntil = nil
+        let pending = waiters
+        waiters.removeAll()
+        pending.forEach { $0.continuation.resume(returning: nil) }
+    }
+
+    private var effectiveLimit: Int {
+        if let rampUntil, Date() < rampUntil {
+            return rampLimit
+        }
+        return limit
+    }
+
+    private func openRamp() {
+        guard GIFThumbGate.allowsDecode else { return }
+        rampUntil = nil
+        while inUse < limit, !waiters.isEmpty {
+            resumeNext()
+        }
+    }
+
+    private func beginWait(_ id: UUID) async -> Int? {
+        if cancelledIDs.remove(id) != nil || Task.isCancelled || !GIFThumbGate.allowsDecode {
+            return nil
+        }
+        if inUse < effectiveLimit {
+            return makeTicket()
+        }
+        return await withCheckedContinuation { continuation in
+            if cancelledIDs.remove(id) != nil || !GIFThumbGate.allowsDecode {
+                continuation.resume(returning: nil)
+                return
+            }
+            waiters.append((id, continuation))
+        }
+    }
+
+    private func cancelWaiter(_ id: UUID) {
+        if let index = waiters.firstIndex(where: { $0.id == id }) {
+            waiters.remove(at: index).continuation.resume(returning: nil)
+        } else {
+            cancelledIDs.insert(id)
+        }
+    }
+
+    private func resumeNext() {
+        guard GIFThumbGate.allowsDecode, inUse < effectiveLimit, !waiters.isEmpty else { return }
+        let waiter = waiters.removeFirst()
+        waiter.continuation.resume(returning: makeTicket())
+    }
+
+    private func makeTicket() -> Int {
+        inUse += 1
+        nextTicket += 1
+        held.insert(nextTicket)
+        return nextTicket
+    }
+}
+
+private struct KlipyGIFGridCell: View {
+    let gif: KlipyGIF
+
+    @State private var blur: UIImage?
+    @State private var play = false
+    @State private var ticket: Int?
+
+    var body: some View {
+        ZStack {
+            Color(.tertiarySystemFill)
+            if let blur {
+                Image(uiImage: blur)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            if let stillURL = gif.stillURL {
+                LazyImage(url: stillURL) { state in
+                    if let image = state.image {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+            }
+            if play, let videoURL = gif.gridVideoURL {
+                GIFLoopVideoView(url: videoURL)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 140)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .task(id: gif.id) {
+            await decodeBlurIfNeeded()
+            // Let stills paint and the tab stay interactive before AVPlayers start.
+            try? await Task.sleep(for: .milliseconds(120))
+            guard !Task.isCancelled else { return }
+            guard gif.gridVideoURL != nil else { return }
+            guard GIFThumbGate.allowsDecode else { return }
+            guard let ticket = await GIFAnimateSlots.shared.acquire() else { return }
+            guard !Task.isCancelled, GIFThumbGate.allowsDecode else {
+                await GIFAnimateSlots.shared.release(ticket)
+                return
+            }
+            self.ticket = ticket
+            play = true
+        }
+        .onDisappear {
+            stopPlayback()
+        }
+    }
+
+    private func decodeBlurIfNeeded() async {
+        guard blur == nil, let data = gif.blurPreview else { return }
+        let image = await Task.detached(priority: .utility) {
+            UIImage(data: data)
+        }.value
+        guard !Task.isCancelled else { return }
+        blur = image
+    }
+
+    private func stopPlayback() {
+        play = false
+        guard let ticket else { return }
+        self.ticket = nil
+        Task { await GIFAnimateSlots.shared.release(ticket) }
     }
 }

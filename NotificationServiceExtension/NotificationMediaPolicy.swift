@@ -2,8 +2,17 @@ import Foundation
 
 enum NotificationMediaPolicy {
     static let communicationTypes: Set<String> = [
-        "comment", "reply", "mention", "like", "follow", "repost", "profile_view",
+        "comment", "reply", "mention", "like", "follow", "repost", "profile_view", "dm",
     ]
+
+    /// Glyph drawn in the communication-notification avatar when the sender has no photo.
+    static func avatarInitial(for name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let withoutAt = trimmed.hasPrefix("@") ? String(trimmed.dropFirst()) : trimmed
+        let source = withoutAt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = source.first else { return "?" }
+        return String(first).uppercased()
+    }
     static let maxImageBytes = 512 * 1024
 
     static func isCommunicationEvent(_ type: String?) -> Bool {

@@ -13,8 +13,28 @@ enum AppEnvironment {
         #endif
     }
 
+    /// Default: `dev-api.altons.trade` (same account/SSO as production-shaped Dev).
+    /// Local stack (`./scripts/dev-local.sh`): set scheme env `ALTON_USE_LOCAL_API=1`
+    /// (simulator → `127.0.0.1`; device → also set `ALTON_LOCAL_HOST` to the Mac LAN IP).
+    /// `ALTON_USE_REMOTE_API=1` forces remote even if local flags are set.
+    private static var useLocalStack: Bool {
+        let env = ProcessInfo.processInfo.environment
+        if env["ALTON_USE_REMOTE_API"] == "1" { return false }
+        return env["ALTON_USE_LOCAL_API"] == "1"
+    }
+
+    private static var localHost: String {
+        let host = ProcessInfo.processInfo.environment["ALTON_LOCAL_HOST"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let host, !host.isEmpty { return host }
+        return "127.0.0.1"
+    }
+
     /// REST API (feed, posts, refresh).
     var apiBaseURL: URL {
+        if Self.useLocalStack {
+            return URL(string: "http://\(Self.localHost):8080")!
+        }
         switch self {
         case .development:
             return URL(string: "https://dev-api.altons.trade")!
@@ -25,11 +45,28 @@ enum AppEnvironment {
 
     /// SSO service — passwordless auth providers.
     var ssoBaseURL: URL {
+        if Self.useLocalStack {
+            // Gateway proxies /auth; SSO health is :8081 but clients use gateway in local smoke.
+            return URL(string: "http://\(Self.localHost):8080")!
+        }
         switch self {
         case .development:
             return URL(string: "https://dev-sso.altons.trade")!
         case .production:
             return URL(string: "https://sso.altons.trade")!
+        }
+    }
+
+    /// WebSocket for DMs / realtime (proxied through api-gateway).
+    var realtimeWebSocketURL: URL {
+        if Self.useLocalStack {
+            return URL(string: "ws://\(Self.localHost):8080/v1/ws")!
+        }
+        switch self {
+        case .development:
+            return URL(string: "wss://dev-api.altons.trade/v1/ws")!
+        case .production:
+            return URL(string: "wss://api.altons.trade/v1/ws")!
         }
     }
 

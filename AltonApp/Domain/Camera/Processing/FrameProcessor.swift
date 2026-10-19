@@ -62,6 +62,12 @@ final class FrameProcessor: NSObject {
     }
 
     private func handleSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
+        // Direct camera uses AVCaptureVideoPreviewLayer — no Metal consumers.
+        // Skip all CI/Metal work so A13 never hits AGX during still capture.
+        let needsPreview = previewRenderer.hasConsumers
+        let isRecording = videoCaptureProcessor?.recording == true
+        guard needsPreview || isRecording else { return }
+
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
 
@@ -85,7 +91,7 @@ final class FrameProcessor: NSObject {
         if !useReducedProcessing {
             if greenScreenProcessor.isEnabled {
                 // Full-res compositing only while recording; preview uses half scale to cut buffer memory.
-                greenScreenProcessor.outputScale = (videoCaptureProcessor?.recording == true) ? 1.0 : 0.5
+                greenScreenProcessor.outputScale = isRecording ? 1.0 : 0.5
                 let orientation = Self.exifOrientation(from: sampleBuffer)
                 image = greenScreenProcessor.process(image, orientation: orientation)
             } else {
@@ -100,7 +106,7 @@ final class FrameProcessor: NSObject {
         previewRenderer.submit(image)
         recordProcessingFPS()
 
-        guard let videoCaptureProcessor, videoCaptureProcessor.recording else { return }
+        guard isRecording, let videoCaptureProcessor else { return }
         videoCaptureProcessor.append(
             pixelBuffer: pixelBuffer,
             processedImage: image,

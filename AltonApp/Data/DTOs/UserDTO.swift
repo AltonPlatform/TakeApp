@@ -36,6 +36,7 @@ struct UserProfileDTO: Decodable {
     let displayName: String
     let bio: String?
     let avatarURL: URL?
+    let avatarFullURL: URL?
     let suiWallet: String?
     let createdAt: String?
     let followerCount: Int
@@ -53,6 +54,7 @@ struct UserProfileDTO: Decodable {
         case id, username, bio, gender, interests
         case displayName = "display_name"
         case avatarURL = "avatar_url"
+        case avatarFullURL = "avatar_full_url"
         case suiWallet = "sui_wallet"
         case createdAt = "created_at"
         case followerCount = "follower_count"
@@ -74,6 +76,7 @@ struct UserProfileDTO: Decodable {
         displayName = try container.decode(String.self, forKey: .displayName)
         bio = try container.decodeIfPresent(String.self, forKey: .bio)
         avatarURL = try container.decodeIfPresent(URL.self, forKey: .avatarURL)
+        avatarFullURL = try container.decodeIfPresent(URL.self, forKey: .avatarFullURL)
         suiWallet = try container.decodeIfPresent(String.self, forKey: .suiWallet)
         createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
         followerCount = try container.decode(Int.self, forKey: .followerCount)
@@ -101,6 +104,7 @@ struct UserProfileDTO: Decodable {
             displayName: displayName,
             bio: bio,
             avatarURL: avatarURL,
+            avatarFullURL: avatarFullURL,
             suiWallet: suiWallet,
             createdAt: APIDateParser.parse(createdAt),
             followerCount: followerCount,

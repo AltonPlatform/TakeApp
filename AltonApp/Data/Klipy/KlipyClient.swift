@@ -33,6 +33,14 @@ struct KlipyGIF: Identifiable, Hashable, Sendable {
     let slug: String
     let title: String
     let previewURL: URL
+    /// Smallest animated rendition. Kept for send/preview paths that still need a raster.
+    let thumbURL: URL
+    /// JPEG still from the catalog. The grid paints this before any animation download.
+    let stillURL: URL?
+    /// Looped MP4 for the picker grid (hardware decode, no ImageIO).
+    let gridVideoURL: URL?
+    /// Tiny JPEG already inside the catalog JSON, so the first frame needs no network.
+    let blurPreview: Data?
     let downloadURL: URL
     let contentType: String
     let width: Int
@@ -43,11 +51,13 @@ struct KlipyGIF: Identifiable, Hashable, Sendable {
     }
 }
 
-/// Picks the best Klipy raster that still copies through media-service: md → sm → xs, under 4 MB.
+/// Picks the best Klipy raster that still copies through media-service: hd → md → sm → xs, under 4 MB.
 enum KlipyAssetPicker {
     static let maxBytes = 4 * 1024 * 1024
     /// media-service copies WebP as-is only when both sides are ≤ this.
     static let maxCopyDimension = 2048
+    /// Grid cells are ~525pt wide; avoid xs (~220) so previews stay sharp.
+    static let previewMinWidth = 360
 
     struct Candidate: Equatable {
         let url: String
@@ -65,23 +75,67 @@ enum KlipyAssetPicker {
         let height: Int
     }
 
+    /// Raster formats media-service can copy. JPEG and MP4 are grid-only.
+    private static func isSendableRaster(_ contentType: String) -> Bool {
+        contentType == "image/gif" || contentType == "image/webp"
+    }
+
     static func preferred(from candidates: [Candidate]) -> Asset? {
-        if let asset = candidates.compactMap(acceptable).first {
+        let animated = candidates.filter { isSendableRaster($0.contentType) }
+        if let asset = animated.compactMap(acceptable).first {
             return asset
         }
 
         // GIF is copied regardless of pixel size; WebP over 2048 may flatten on re-encode.
-        return candidates.compactMap { candidate -> Asset? in
+        return animated.compactMap { candidate -> Asset? in
             guard candidate.contentType == "image/gif" else { return nil }
             return acceptableIgnoringDimension(candidate)
         }.first
     }
 
-    /// Smallest safe raster for grid/chips so a missing `size` on md does not load the heaviest file.
+    /// Smallest file for the picker. Grid cells must not download the 360px animation.
+    static func gridThumb(from candidates: [Candidate]) -> Asset? {
+        candidates
+            .filter { isSendableRaster($0.contentType) }
+            .compactMap(acceptable)
+            .min(by: isLighterPreview)
+    }
+
+    /// Static JPEG for the grid. Prefer a ~220px still over the tiny xs frame.
+    static func gridStill(from candidates: [Candidate]) -> Asset? {
+        let jpegs = candidates
+            .filter { $0.contentType == "image/jpeg" }
+            .compactMap(acceptable)
+        let usable = jpegs.filter { $0.width >= 180 }
+        return (usable.isEmpty ? jpegs : usable).min(by: isLighterPreview)
+    }
+
+    /// Looped MP4 for ~140pt grid cells. Prefer lightest ~220–360px; skip heavy md/hd.
+    static func gridVideo(from candidates: [Candidate]) -> Asset? {
+        let videos = candidates
+            .filter { $0.contentType == "video/mp4" }
+            .compactMap { candidate -> Asset? in
+                guard max(candidate.width, candidate.height) <= 400 else { return nil }
+                return acceptableIgnoringDimension(candidate)
+            }
+        let ideal = videos.filter { $0.width >= 200 }
+        if let lightest = ideal.min(by: isLighterPreview) {
+            return lightest
+        }
+        return videos.max(by: { $0.width * $0.height < $1.width * $1.height })
+    }
+
+    /// Lightest acceptable raster that is still sharp enough for the GIF grid (≥ `previewMinWidth`).
     static func preview(from candidates: [Candidate]) -> Asset? {
-        let accepted = candidates.compactMap(acceptable)
-        if let smallest = accepted.min(by: isLighterPreview) {
-            return smallest
+        let accepted = candidates
+            .filter { isSendableRaster($0.contentType) }
+            .compactMap(acceptable)
+        let sharp = accepted.filter { $0.width >= previewMinWidth }
+        if let smallestSharp = sharp.min(by: isLighterPreview) {
+            return smallestSharp
+        }
+        if let largest = accepted.max(by: { $0.width * $0.height < $1.width * $1.height }) {
+            return largest
         }
         return preferred(from: candidates)
     }
@@ -180,18 +234,31 @@ actor KlipyClient {
 
     private let session: URLSession
     private let maxGIFBytes = KlipyAssetPicker.maxBytes
+    /// First page of trending, filled when the attach sheet opens so the GIF tab is not a cold request.
+    private var trendingCache: [KlipyGIF]?
 
     init(session: URLSession = .shared) {
         self.session = session
     }
 
+    func prefetchTrending() async {
+        _ = try? await trending()
+    }
+
     func trending(page: Int = 1, perPage: Int = 30) async throws -> [KlipyGIF] {
-        try await fetch(path: "/gifs/trending", queryItems: [
+        if page == 1, perPage == 30, let trendingCache, !trendingCache.isEmpty {
+            return trendingCache
+        }
+        let gifs = try await fetch(path: "/gifs/trending", queryItems: [
             URLQueryItem(name: "page", value: String(page)),
             URLQueryItem(name: "per_page", value: String(perPage)),
             URLQueryItem(name: "customer_id", value: KlipyConfig.customerID),
             URLQueryItem(name: "locale", value: "en"),
         ])
+        if page == 1, perPage == 30, !gifs.isEmpty {
+            trendingCache = gifs
+        }
+        return gifs
     }
 
     func search(query: String, page: Int = 1, perPage: Int = 30) async throws -> [KlipyGIF] {
@@ -278,8 +345,20 @@ private struct KlipyPaginatedData: Decodable {
     let data: [KlipyAPIItem]
 }
 
+private enum KlipyBlurPreview {
+    static func imageData(from raw: String?) -> Data? {
+        guard var text = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+            return nil
+        }
+        if let comma = text.firstIndex(of: ","), text[..<comma].localizedCaseInsensitiveContains("base64") {
+            text = String(text[text.index(after: comma)...])
+        }
+        return Data(base64Encoded: text)
+    }
+}
+
 private struct KlipyAPIItem: Decodable {
-    let id: Int?
+    let id: String?
     let title: String?
     let slug: String?
     let blurPreview: String?
@@ -290,6 +369,20 @@ private struct KlipyAPIItem: Decodable {
     enum CodingKeys: String, CodingKey {
         case id, title, slug, file, content
         case blurPreview = "blur_preview"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let numeric = try? container.decode(Int.self, forKey: .id) {
+            id = String(numeric)
+        } else {
+            id = try container.decodeIfPresent(String.self, forKey: .id)
+        }
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        slug = try container.decodeIfPresent(String.self, forKey: .slug)
+        blurPreview = try container.decodeIfPresent(String.self, forKey: .blurPreview)
+        file = try container.decodeIfPresent(KlipySizeVariants.self, forKey: .file)
+        content = try container.decodeIfPresent(String.self, forKey: .content)
     }
 
     func asGIF() -> KlipyGIF? {
@@ -305,13 +398,21 @@ private struct KlipyAPIItem: Decodable {
         guard let download else {
             return nil
         }
-        let preview = KlipyAssetPicker.preview(from: file.candidates()) ?? download
+        let candidates = file.candidates()
+        let preview = KlipyAssetPicker.preview(from: candidates) ?? download
+        let thumb = KlipyAssetPicker.gridThumb(from: candidates) ?? preview
+        let still = KlipyAssetPicker.gridStill(from: candidates)
+        let video = KlipyAssetPicker.gridVideo(from: candidates)
 
         return KlipyGIF(
-            id: String(id),
+            id: id,
             slug: slug,
             title: title ?? "",
             previewURL: preview.url,
+            thumbURL: thumb.url,
+            stillURL: still?.url,
+            gridVideoURL: video?.url,
+            blurPreview: KlipyBlurPreview.imageData(from: blurPreview),
             downloadURL: download.url,
             contentType: download.contentType,
             width: download.width,
@@ -321,26 +422,24 @@ private struct KlipyAPIItem: Decodable {
 }
 
 private struct KlipySizeVariants: Decodable {
-    let hd: KlipyFileFormats
-    let md: KlipyFileFormats
-    let sm: KlipyFileFormats
-    let xs: KlipyFileFormats
+    let hd: KlipyFileFormats?
+    let md: KlipyFileFormats?
+    let sm: KlipyFileFormats?
+    let xs: KlipyFileFormats?
 
     func candidates() -> [KlipyAssetPicker.Candidate] {
-        [
-            md.asCandidates(),
-            sm.asCandidates(),
-            xs.asCandidates(),
-        ].flatMap { $0 }
+        [hd, md, sm, xs].compactMap { $0?.asCandidates() }.flatMap { $0 }
     }
 }
 
 private extension KlipyFileFormats {
     func asCandidates() -> [KlipyAssetPicker.Candidate] {
         [
-            webp.asCandidate(contentType: "image/webp"),
-            gif.asCandidate(contentType: "image/gif"),
-        ]
+            jpg?.asCandidate(contentType: "image/jpeg"),
+            webp?.asCandidate(contentType: "image/webp"),
+            gif?.asCandidate(contentType: "image/gif"),
+            mp4?.asCandidate(contentType: "video/mp4"),
+        ].compactMap { $0 }
     }
 }
 
@@ -357,8 +456,10 @@ private extension KlipyFileMeta {
 }
 
 private struct KlipyFileFormats: Decodable {
-    let gif: KlipyFileMeta
-    let webp: KlipyFileMeta
+    let gif: KlipyFileMeta?
+    let webp: KlipyFileMeta?
+    let jpg: KlipyFileMeta?
+    let mp4: KlipyFileMeta?
 }
 
 private struct KlipyFileMeta: Decodable {

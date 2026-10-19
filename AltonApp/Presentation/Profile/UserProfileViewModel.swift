@@ -324,11 +324,15 @@ final class EditProfileViewModel {
             }
             let upload = try await userUseCase.prepareAvatarUpload(contentType: contentType)
             try await mediaUploadClient.upload(data: data, to: upload.uploadURL, contentType: contentType)
-            savedProfile = try await userUseCase.updateProfile(
-                displayName: nil,
-                bio: nil,
-                avatarR2Key: upload.objectKey
-            )
+            try await userUseCase.completeAvatarUpload(objectKey: upload.objectKey)
+            // Processing is async; keep local preview and refresh profile shortly.
+            for _ in 0..<6 {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                if let refreshed = try? await userUseCase.loadCurrentProfile() {
+                    savedProfile = refreshed
+                    if refreshed.avatarURL != nil { break }
+                }
+            }
         } catch {
             if NetworkErrorClassifier.isCancellation(error) { return }
             errorMessage = error.localizedDescription

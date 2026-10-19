@@ -55,6 +55,8 @@ targets:
       - path: AltonApp
         excludes:
           - Resources/GoogleService-Info.example.plist
+      # Shared with the notification extension (App Group current-user filter).
+      - path: NotificationServiceExtension/AccountPushIdentity.swift
     dependencies:
       - package: Firebase
         product: FirebaseCore
@@ -76,6 +78,8 @@ targets:
       # Add CASMediation* products when wiring production ad networks.
       - package: CleverAdsSolutions
         product: CleverAdsSolutionsSPM
+      - target: NotificationServiceExtension
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alton.altonApp
@@ -110,12 +114,37 @@ targets:
     platform: iOS
     sources:
       - path: AltonAppTests
+      # Policy-enum lives outside the app folder; compiled into the test target
+      # so NotificationMediaPolicyTests can see it without @testable access.
+      - path: NotificationServiceExtension/NotificationMediaPolicy.swift
     dependencies:
       - target: AltonApp
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alton.altonApp.tests
         GENERATE_INFOPLIST_FILE: YES
+  NotificationServiceExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: NotificationServiceExtension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alton.altonApp.NotificationService
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: NotificationServiceExtension/Info.plist
+        CODE_SIGN_ENTITLEMENTS: NotificationServiceExtension/NotificationServiceExtension.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+        CURRENT_PROJECT_VERSION: 3
+        MARKETING_VERSION: 1.0
+        LD_RUNPATH_SEARCH_PATHS:
+          - $(inherited)
+          - "@executable_path/Frameworks"
+          - "@executable_path/../../Frameworks"
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG $(inherited)"
 schemes:
   AltonApp:
     build:

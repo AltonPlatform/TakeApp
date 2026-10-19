@@ -21,6 +21,9 @@ final class DependencyContainer {
     let activityRepository: PostActivityRepository
     let userRepository: UserRepository
     let bookmarksRepository: BookmarksRepository
+    let directRepository: DirectRepository
+    let realtimeClient: RealtimeClient
+    let presenceStore: PresenceStore
 
     let authUseCase: AuthUseCase
     let feedUseCase: FeedUseCase
@@ -34,11 +37,13 @@ final class DependencyContainer {
     let userUseCase: UserUseCase
     let bookmarksUseCase: BookmarksUseCase
     let searchUseCase: SearchUseCase
+    let directUseCase: DirectUseCase
     let earningsRepository: EarningsRepository
     let adRepository: AdRepository
     let sessionStore: AppSessionStore
     let appState: AppState
     let draftStore: DraftStore
+    let messageCacheStore: MessageCacheStore
 
     init() {
         let tokenStore = KeychainTokenStore()
@@ -73,6 +78,11 @@ final class DependencyContainer {
         self.bookmarksRepository = BookmarksRepository(apiClient: apiClient)
         self.earningsRepository = EarningsRepository(apiClient: apiClient)
         self.adRepository = AdRepository(apiClient: apiClient)
+        let messageCacheStore = MessageCacheStore.makePersistent()
+        self.messageCacheStore = messageCacheStore
+        self.directRepository = DirectRepository(apiClient: apiClient, cache: messageCacheStore)
+        self.realtimeClient = RealtimeClient(tokenStore: tokenStore)
+        self.presenceStore = PresenceStore(apiClient: apiClient)
 
         self.userUseCase = UserUseCase(repository: userRepository)
         self.bookmarksUseCase = BookmarksUseCase(repository: bookmarksRepository)
@@ -86,6 +96,7 @@ final class DependencyContainer {
         self.analyticsUseCase = PostAnalyticsUseCase(repository: analyticsRepository)
         self.activityUseCase = PostActivityUseCase(repository: activityRepository)
         self.notificationUseCase = NotificationUseCase(repository: notificationRepository)
+        self.directUseCase = DirectUseCase(repository: directRepository)
         let hasStoredCredentials = (try? tokenStore.load()) != nil
         self.sessionStore = AppSessionStore(
             authUseCase: authUseCase,
@@ -98,14 +109,64 @@ final class DependencyContainer {
 
         ATTConsentManager.shared.configure(apiClient: apiClient)
         AppSessionTracker.shared.configure(apiClient: apiClient)
+
+        // Cold-start auth failure keeps session nil, so ContentView.onChange never fires —
+        // wire wipe/disconnect from the session store itself.
+        sessionStore.onLocalSessionCleared = { [weak self] in
+            await self?.clearUserSessionState()
+        }
+        sessionStore.onUserChanged = { [weak self] previousUserID, newUserID in
+            self?.applyLocalUserChange(from: previousUserID, to: newUserID)
+        }
     }
 
     func configureAuth() async {
-        await apiClient.setSessionInvalidationHandler { @MainActor [weak sessionStore] in
-            sessionStore?.invalidateSession()
+        await apiClient.setSessionInvalidationHandler { @MainActor [weak self] in
+            guard let self else { return }
+            await self.clearUserSessionState()
+            self.sessionStore.invalidateSession()
         }
         await apiClient.setTokensRefreshedHandler { @MainActor [weak sessionStore] _ in
             await sessionStore?.syncSessionFromStorage()
+        }
+    }
+
+    /// Disconnect realtime and wipe local DM cache. Call on logout / session invalidation.
+    func clearUserSessionState() async {
+        wipeChatDrafts(for: sessionStore.session?.user.id ?? (try? tokenStore.load())?.userID)
+        sessionStore.clearCurrentUserID()
+        await PushRegistrationCenter.unregisterOnLogout()
+        await realtimeClient.disconnect(discardPending: true)
+        messageCacheStore.wipeAll()
+        AppIconBadge.clear()
+    }
+
+    /// Queues socket teardown. Callers that subscribe must `switchGate.wait()` first.
+    private func tearDownRealtime() {
+        let client = realtimeClient
+        client.switchGate.arm(Task { await client.disconnect(discardPending: true) })
+    }
+
+    private func wipeChatDrafts(for userID: String?) {
+        guard let userID else { return }
+        ChatDraftStore(userID: userID).clearAll()
+    }
+
+    /// Drops the previous account's DM cache before the next screen renders.
+    func applyLocalUserChange(from previousUserID: String?, to newUserID: String?) {
+        if let previousUserID, let newUserID, previousUserID != newUserID {
+            wipeChatDrafts(for: previousUserID)
+            messageCacheStore.wipeAll()
+            messageCacheStore.beginSession(userID: newUserID)
+            tearDownRealtime()
+            AppIconBadge.clear()
+        } else if let previousUserID, newUserID == nil {
+            wipeChatDrafts(for: previousUserID)
+            messageCacheStore.wipeAll()
+            tearDownRealtime()
+            AppIconBadge.clear()
+        } else if let newUserID {
+            messageCacheStore.beginSession(userID: newUserID)
         }
     }
 
@@ -161,10 +222,41 @@ final class DependencyContainer {
         )
     }
 
-    func makeActivityViewModel() -> ActivityViewModel {
+    func makeActivityViewModel(category: NotificationCategory? = nil) -> ActivityViewModel {
         ActivityViewModel(
             notificationUseCase: notificationUseCase,
-            userUseCase: userUseCase
+            userUseCase: userUseCase,
+            category: category
+        )
+    }
+
+    func makeInboxViewModel() -> InboxViewModel {
+        InboxViewModel(useCase: directUseCase, realtime: realtimeClient, repository: directRepository)
+    }
+
+    func makeInboxHomeViewModel() -> InboxHomeViewModel {
+        InboxHomeViewModel(
+            inbox: makeInboxViewModel(),
+            notificationUseCase: notificationUseCase,
+            directUseCase: directUseCase
+        )
+    }
+
+    func makeNewMessageViewModel(currentUserID: String) -> NewMessageViewModel {
+        NewMessageViewModel(
+            currentUserID: currentUserID,
+            userUseCase: userUseCase,
+            searchUseCase: searchUseCase,
+            directUseCase: directUseCase
+        )
+    }
+
+    func makeDirectShareDependencies(currentUserID: String) -> DirectShareDependencies {
+        DirectShareDependencies(
+            directUseCase: directUseCase,
+            userUseCase: userUseCase,
+            searchUseCase: searchUseCase,
+            currentUserID: currentUserID
         )
     }
 }

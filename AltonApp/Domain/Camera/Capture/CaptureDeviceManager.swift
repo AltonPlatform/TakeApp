@@ -3,7 +3,95 @@ import AVFoundation
 struct ZoomStop: Identifiable, Equatable, Sendable {
     let id: String
     let label: String
+    /// Native `AVCaptureDevice.videoZoomFactor`.
     let factor: CGFloat
+}
+
+enum CameraZoomStopBuilder {
+    /// Builds UI zoom stops using Apple's display multiplier (ultra-wide = 0.5× on Dual Wide).
+    static func stops(
+        minZoom: CGFloat,
+        maxZoom: CGFloat,
+        switchOvers: [CGFloat],
+        displayMultiplier: CGFloat,
+        isBackCamera: Bool
+    ) -> [ZoomStop] {
+        guard isBackCamera else {
+            return [ZoomStop(id: "1", label: "1×", factor: max(1.0, minZoom))]
+        }
+
+        let multiplier = max(displayMultiplier, 0.01)
+        var candidates: [(display: CGFloat, factor: CGFloat)] = []
+
+        // Ultra-wide when virtual device starts below 1.0 native.
+        if minZoom * multiplier < 0.85 {
+            candidates.append((display: 0.5, factor: minZoom))
+        }
+
+        // Primary "1×" lens.
+        let oneXFactor = 1.0 / multiplier
+        if oneXFactor >= minZoom - 0.05, oneXFactor <= maxZoom + 0.05 {
+            candidates.append((display: 1.0, factor: max(minZoom, min(oneXFactor, maxZoom))))
+        } else {
+            candidates.append((display: minZoom * multiplier, factor: minZoom))
+        }
+
+        for native in switchOvers where native > minZoom + 0.05 {
+            let display = native * multiplier
+            guard display > 0.9 else { continue }
+            candidates.append((display: display, factor: native))
+        }
+
+        // Digital 2× when no optical tele stop near 2× display.
+        let hasNearTwo = candidates.contains { abs($0.display - 2.0) < 0.25 }
+        if !hasNearTwo {
+            let twoFactor = 2.0 / multiplier
+            if twoFactor <= maxZoom + 0.05 {
+                candidates.append((display: 2.0, factor: min(twoFactor, maxZoom)))
+            }
+        }
+
+        // Optional 3× when the device supports it (triple / digital).
+        let hasNearThree = candidates.contains { abs($0.display - 3.0) < 0.35 }
+        if !hasNearThree {
+            let threeFactor = 3.0 / multiplier
+            if threeFactor <= maxZoom + 0.05 {
+                candidates.append((display: 3.0, factor: min(threeFactor, maxZoom)))
+            }
+        }
+
+        var unique: [ZoomStop] = []
+        for item in candidates.sorted(by: { $0.factor < $1.factor }) {
+            if unique.contains(where: { abs($0.factor - item.factor) < 0.05 }) { continue }
+            let label: String
+            if abs(item.display - item.display.rounded()) < 0.05 {
+                if abs(item.display - 0.5) < 0.05 {
+                    label = "0.5×"
+                } else {
+                    label = "\(Int(item.display.rounded()))×"
+                }
+            } else {
+                label = String(format: "%.1f×", item.display)
+            }
+            unique.append(
+                ZoomStop(
+                    id: String(format: "%.2f", item.factor),
+                    label: label,
+                    factor: item.factor
+                )
+            )
+        }
+        return unique
+    }
+
+    static func displayLabel(nativeFactor: CGFloat, displayMultiplier: CGFloat) -> String {
+        let display = nativeFactor * max(displayMultiplier, 0.01)
+        if abs(display - 0.5) < 0.05 { return "0.5×" }
+        if abs(display - display.rounded()) < 0.05 {
+            return "\(Int(display.rounded()))×"
+        }
+        return String(format: "%.1f×", display)
+    }
 }
 
 final class CaptureDeviceManager {
@@ -24,6 +112,27 @@ final class CaptureDeviceManager {
         currentDevice?.videoZoomFactor ?? 1.0
     }
 
+    /// Converts native zoom to the value shown in the system Camera UI.
+    var displayZoomMultiplier: CGFloat {
+        guard let device = currentDevice else { return 1 }
+        if #available(iOS 18.0, *) {
+            let multiplier = device.displayVideoZoomFactorMultiplier
+            return multiplier > 0 ? CGFloat(multiplier) : 1
+        }
+        // Dual Wide / Triple: native 1.0 is ultra-wide → display 0.5×.
+        let minZoom = device.minAvailableVideoZoomFactor
+        if position == .back, minZoom < 0.9 {
+            return 0.5
+        }
+        return 1
+    }
+
+    /// Native factor for the primary "1×" display stop.
+    var primaryZoomFactor: CGFloat {
+        let factor = 1.0 / displayZoomMultiplier
+        return min(max(factor, minZoomFactor), maxZoomFactor)
+    }
+
     var hasFlash: Bool {
         currentDevice?.hasFlash == true
     }
@@ -33,38 +142,17 @@ final class CaptureDeviceManager {
     }
 
     var zoomStops: [ZoomStop] {
-        guard let device = currentDevice, position == .back else {
+        guard let device = currentDevice else {
             return [ZoomStop(id: "1", label: "1×", factor: 1.0)]
         }
-
-        var stops: [ZoomStop] = []
-        let minZoom = device.minAvailableVideoZoomFactor
-
-        if minZoom < 0.9 {
-            stops.append(ZoomStop(id: "0.5", label: "0.5×", factor: minZoom))
-        }
-
-        stops.append(ZoomStop(id: "1", label: "1×", factor: max(1.0, minZoom)))
-
         let switchOvers = device.virtualDeviceSwitchOverVideoZoomFactors.map { CGFloat(truncating: $0) }
-        for factor in switchOvers where factor > 1.0 {
-            let label = factor.truncatingRemainder(dividingBy: 1) == 0
-                ? "\(Int(factor))×"
-                : String(format: "%.1f×", factor)
-            stops.append(ZoomStop(id: String(format: "%.2f", factor), label: label, factor: factor))
-        }
-
-        if stops.count == 1, maxZoomFactor >= 2 {
-            stops.append(ZoomStop(id: "2", label: "2×", factor: min(2.0, maxZoomFactor)))
-        }
-
-        var unique: [ZoomStop] = []
-        for stop in stops {
-            if !unique.contains(where: { abs($0.factor - stop.factor) < 0.05 }) {
-                unique.append(stop)
-            }
-        }
-        return unique.sorted { $0.factor < $1.factor }
+        return CameraZoomStopBuilder.stops(
+            minZoom: device.minAvailableVideoZoomFactor,
+            maxZoom: maxZoomFactor,
+            switchOvers: switchOvers,
+            displayMultiplier: displayZoomMultiplier,
+            isBackCamera: position == .back
+        )
     }
 
     func selectDevice(for position: AVCaptureDevice.Position) -> AVCaptureDevice? {
@@ -127,7 +215,11 @@ final class CaptureDeviceManager {
 
         try device.lockForConfiguration()
         defer { device.unlockForConfiguration() }
-        device.ramp(toVideoZoomFactor: clamped, withRate: rampRate)
+        if rampRate <= 0 {
+            device.videoZoomFactor = clamped
+        } else {
+            device.ramp(toVideoZoomFactor: clamped, withRate: rampRate)
+        }
     }
 
     func setFocus(at normalizedPoint: CGPoint, lock: Bool) throws {
@@ -166,8 +258,12 @@ final class CaptureDeviceManager {
         try device.lockForConfiguration()
         defer { device.unlockForConfiguration() }
 
-        if device.exposureMode != .locked,
-           device.isExposureModeSupported(.continuousAutoExposure) {
+        if device.exposureMode == .locked {
+            // One-shot re-meter so EV changes apply while AE/AF lock is active.
+            if device.isExposureModeSupported(.autoExpose) {
+                device.exposureMode = .autoExpose
+            }
+        } else if device.isExposureModeSupported(.continuousAutoExposure) {
             device.exposureMode = .continuousAutoExposure
         }
 

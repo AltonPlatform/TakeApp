@@ -1,6 +1,17 @@
 import UIKit
 
 enum ShotHaptics {
+    private static let sendImpact = UIImpactFeedbackGenerator(style: .light)
+
+    /// Warm the send tap so the impact lands on finger-up without a delay.
+    static func prepareSend() {
+        sendImpact.prepare()
+    }
+
+    static func send() {
+        sendImpact.impactOccurred()
+    }
+
     static func play() {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
     }
